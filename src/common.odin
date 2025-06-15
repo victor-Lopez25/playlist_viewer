@@ -1,8 +1,8 @@
 package main
 
 import "core:prof/spall"
-import ray "vendor:raylib"
 import clay "clay-odin"
+import sdl "vendor:sdl3"
 
 SongSourceType :: enum {
   None, /* no song source */
@@ -27,21 +27,24 @@ Playlist :: struct {
 AppData :: struct {
   spall_ctx: spall.Context,
   spall_buffer: spall.Buffer, // NOTE: This must be one per thread
-  
+
+  window: ^sdl.Window,
+  renderer: ^sdl.Renderer,
+  windowWidth, windowHeight: i32,
+
   volume: f32,
   playlist: Playlist,
   spall_backing_buffer: []u8,
-  screenWidth, screenHeight: i32,
   quit: bool,
 
-  music: ray.Music,
+  //music: ray.Music,
   musicTimeLength: f32,
   musicTimePlayed: f32,
   musicSliderValue: f32,
   musicLoaded: bool,
   musicPause: bool,
 
-  fonts: [2]ray.Font,
+  //fonts: [2]ray.Font,
   sliderSelected: clay.ElementId,
 
   playlistFileAbsPath: string,

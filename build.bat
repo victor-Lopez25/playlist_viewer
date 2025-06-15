@@ -1,11 +1,11 @@
 @echo off
 rem Hot reloading script mostly from: https://github.com/karl-zylinski/odin-raylib-hot-reload-game-template/blob/main/build_hot_reload.bat
 :: Copyright (c) 2024 Karl Zylinski
-:: 
+::
 :: Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-:: 
+::
 :: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-:: 
+::
 :: THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 set odinreleaseflags=-no-bounds-check -disable-assert -no-type-assert -o:speed
@@ -59,7 +59,7 @@ set /p PDB_NUMBER=<%PDBS_DIR%\pdb_number
 set /a PDB_NUMBER=%PDB_NUMBER%+1
 echo %PDB_NUMBER% > %PDBS_DIR%\pdb_number
 
-odin build src -vet -vet-using-param -vet-style -debug -define:RAYLIB_SHARED=true -build-mode:dll -out:%OUT_DIR%\app.dll -pdb-name:%PDBS_DIR%\app_%PDB_NUMBER%.pdb > nul
+odin build src -vet -vet-using-param -vet-style -debug -build-mode:dll -out:%OUT_DIR%\app.dll -pdb-name:%PDBS_DIR%\app_%PDB_NUMBER%.pdb > nul
 if %ERRORLEVEL% neq 0 goto endbuilderr
 if %APP_RUNNING% == true (
   goto endbuild
@@ -72,13 +72,13 @@ if %ERRORLEVEL% neq 0 goto endbuilderr
 set ODIN_PATH=
 for /f "delims=" %%i in ('odin root') do set "ODIN_PATH=%%i"
 
-if not exist "raylib.dll" (
-  if exist "%ODIN_PATH%\vendor\raylib\windows\raylib.dll" (
-    echo raylib.dll not found in current directory. Copying from %ODIN_PATH%\vendor\raylib\windows\raylib.dll
-    copy "%ODIN_PATH%\vendor\raylib\windows\raylib.dll" .
+if not exist "SDL3.dll" (
+  if exist "%ODIN_PATH%\vendor\sdl3\SDL3.dll" (
+    echo SDL3.dll not found in current directory. Copying from %ODIN_PATH%\vendor\sdl3\SDL3.dll
+    copy "%ODIN_PATH%\vendor\sdl3\SDL3.dll" .
     IF %ERRORLEVEL% NEQ 0 goto endbuilderr
   ) else (
-    echo Please copy raylib.dll from <your_odin_compiler>/vendor/raylib/windows/raylib.dll to the same directory as app.exe
+    echo Please copy SDL3.dll from <your_odin_compiler>/vendor/sdl3/SDL3.dll to the same directory as app.exe
     goto endbuilderr
   )
 )

@@ -9,7 +9,7 @@ import "core:math/rand"
 import "core:path/filepath"
 
 import "core:prof/spall"
-import ray "vendor:raylib"
+import sdl "vendor:sdl3"
 
 DATAFILE_NAME :: "prog.dat"
 
@@ -220,11 +220,11 @@ ParseSongs_v1 :: proc(data: []u8) -> [dynamic]SongData
 ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-  
+
   playlist := &app.playlist
   if playlist.songs[playlist.activeSongIdx].source != "" {
     if app.musicLoaded {
-      ray.UnloadMusicStream(app.music)
+      //ray.UnloadMusicStream(app.music)
       app.musicLoaded = false
     }
 
@@ -236,20 +236,20 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
       }
       case .File: {
         if os.exists(activeSong.source) {
-          filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
-          app.music = ray.LoadMusicStream(filename)
-          app.music.looping = false
-          ray.PlayMusicStream(app.music)
+          //filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
+          //app.music = ray.LoadMusicStream(filename)
+          //app.music.looping = false
+          //ray.PlayMusicStream(app.music)
           app.musicLoaded = true
         }
         else {
           b: strings.Builder = strings.builder_make_len_cap(0, 40, context.temp_allocator)
           filepath := fmt.sbprintf(&b, "../songs/%s", activeSong.source)
           if os.exists(filepath) {
-            file, _ := strings.to_cstring(&b)
-            app.music = ray.LoadMusicStream(file)
-            app.music.looping = false
-            ray.PlayMusicStream(app.music)
+            //file, _ := strings.to_cstring(&b)
+            //app.music = ray.LoadMusicStream(file)
+            //app.music.looping = false
+            //ray.PlayMusicStream(app.music)
             app.musicLoaded = true
           }
           else {
@@ -260,36 +260,37 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
     }
 
     // NOTE: Gather 'static' data from app.music here
-    app.musicTimeLength = ray.GetMusicTimeLength(app.music)
+    //app.musicTimeLength = ray.GetMusicTimeLength(app.music)
     app.musicTimePlayed = 0.0
   }
 }
 
-InitRaylib :: proc(app: ^AppData)
+InitSDL3 :: proc(app: ^AppData)
 {
-  spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-  ray.SetTraceLogLevel(.WARNING)
-  ray.SetConfigFlags({.VSYNC_HINT, .WINDOW_RESIZABLE, .WINDOW_HIGHDPI, .MSAA_4X_HINT, .WINDOW_ALWAYS_RUN}) // WINDOW_HIGHDPI
-  app.screenWidth = 1000
-  app.screenHeight = 800
-  ray.InitWindow(app.screenWidth, app.screenHeight, "playlist viewer")
+  ok := sdl.Init({.VIDEO})
+  assert(ok, "Could not init sdl")
+
+  app.windowWidth = 1000
+  app.windowHeight = 800
+  ok = sdl.CreateWindowAndRenderer("playlist viewer", app.windowWidth, app.windowHeight, {.RESIZABLE}, &app.window, &app.renderer)
+  assert(ok, "Could not create window and renderer")
 }
 
 InitClay :: proc(app: ^AppData)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-  app.fonts[Font_Inconsolata] = ray.LoadFontEx("resources/Inconsolata-Regular.ttf", 48, nil, 400)
-  ray.SetTextureFilter(app.fonts[Font_Inconsolata].texture, .BILINEAR)
-  app.fonts[Font_LiberationMono] = ray.LoadFontEx("resources/liberation-mono.ttf", 48, nil, 400)
-  ray.SetTextureFilter(app.fonts[Font_LiberationMono].texture, .BILINEAR)
-  Clay_Init(&app.fonts[0], app.screenWidth, app.screenHeight)
+  //app.fonts[Font_Inconsolata] = ray.LoadFontEx("resources/Inconsolata-Regular.ttf", 48, nil, 400)
+  //ray.SetTextureFilter(app.fonts[Font_Inconsolata].texture, .BILINEAR)
+  //app.fonts[Font_LiberationMono] = ray.LoadFontEx("resources/liberation-mono.ttf", 48, nil, 400)
+  //ray.SetTextureFilter(app.fonts[Font_LiberationMono].texture, .BILINEAR)
+  Clay_Init(nil, app.windowWidth, app.windowHeight)
 }
 
 @export
 InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
 {
   app := cast(^AppData)rawApp
-  input := cast(^Input)rawInput
+  //input := cast(^Input)rawInput
 
   app.spall_ctx = spall.context_create("trace.spall")
   app.spall_backing_buffer = make([]u8, spall.BUFFER_DEFAULT_SIZE)
@@ -360,18 +361,11 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   // volume 1 is way too high
   if app.volume == 0 { app.volume = 0.18 }
 
-  InitRaylib(app)
+  InitSDL3(app)
   InitPartial(rawApp, rawInput)
 
-  // NOTE: Starting up audio takes very long so I do a 'fake' ui first
-  {
-    spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, "init raylib audio + render single frame")
-    Render(app, input)
-    ray.InitAudioDevice()
-  }
-
-  ray.SetTargetFPS(60)
-  ray.SetMasterVolume(app.volume)
+  //ray.SetTargetFPS(60)
+  //ray.SetMasterVolume(app.volume)
 
   return
 }
@@ -403,9 +397,11 @@ DeInitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   input := cast(^Input)rawInput
   DeInitPartial(rawApp, rawInput)
 
-  for &f in app.fonts { ray.UnloadFont(f) }
-  ray.CloseAudioDevice()
-  ray.CloseWindow()
+  //for &f in app.fonts { ray.UnloadFont(f) }
+
+  sdl.DestroyRenderer(app.renderer)
+  sdl.DestroyWindow(app.window)
+  sdl.Quit()
 
   {
     //playlistAbsPathData := transmute([]u8)app.playlistFileAbsPath
@@ -453,75 +449,75 @@ ForwardTime :: #force_inline proc(app: ^AppData, seconds: f32)
   if app.musicTimePlayed == app.musicTimeLength {
     NextSong(app)
   } else {
-    ray.SeekMusicStream(app.music, app.musicTimePlayed)
+    //ray.SeekMusicStream(app.music, app.musicTimePlayed)
   }
 }
 
 BackTime :: #force_inline proc(app: ^AppData, seconds: f32)
 {
   app.musicTimePlayed = max(app.musicTimePlayed - seconds, 0.06)
-  ray.SeekMusicStream(app.music, app.musicTimePlayed)
+  //ray.SeekMusicStream(app.music, app.musicTimePlayed)
 }
 
 Update :: proc(app: ^AppData, input: ^Input)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
-  ray.UpdateMusicStream(app.music)
+  //ray.UpdateMusicStream(app.music)
 
   // If the song finished, go to the next
-  if !app.musicPause && app.musicLoaded && !ray.IsMusicStreamPlaying(app.music) {
-    NextSong(app)
-  }
+  //if !app.musicPause && app.musicLoaded && !ray.IsMusicStreamPlaying(app.music) {
+  //  NextSong(app)
+  //}
 
   // volume
-  if ray.IsKeyPressed(.UP) {
+  if false { // ray.IsKeyPressed(.UP) {
     app.volume = min(app.volume + 0.05, 1.0)
-    ray.SetMasterVolume(app.volume)
+    //ray.SetMasterVolume(app.volume)
   }
-  if ray.IsKeyPressed(.DOWN) {
+  if false { // ray.IsKeyPressed(.DOWN) {
     app.volume = max(app.volume - 0.05, 0.0)
-    ray.SetMasterVolume(app.volume)
+    //ray.SetMasterVolume(app.volume)
   }
 
   // song control
-  app.musicTimePlayed = ray.GetMusicTimePlayed(app.music)
-  if ray.IsKeyPressed(.RIGHT) { ForwardTime(app, 5.0) }
-  else if ray.IsKeyPressed(.LEFT) { BackTime(app, 5.0) }
-  if ray.IsKeyPressed(.L) { ForwardTime(app, 10.0) }
-  else if ray.IsKeyPressed(.J) { BackTime(app, 10.0) }
+  //app.musicTimePlayed = ray.GetMusicTimePlayed(app.music)
+  //if ray.IsKeyPressed(.RIGHT) { ForwardTime(app, 5.0) }
+  //else if ray.IsKeyPressed(.LEFT) { BackTime(app, 5.0) }
+  //if ray.IsKeyPressed(.L) { ForwardTime(app, 10.0) }
+  //else if ray.IsKeyPressed(.J) { BackTime(app, 10.0) }
 
-  if ray.IsKeyPressed(.END) || ray.IsKeyPressed(.KP_1) {
-    NextSong(app)
-  } else if ray.IsKeyPressed(.HOME) || ray.IsKeyPressed(.KP_7) {
-    if app.musicTimePlayed < 12.0 {
-      PrevSong(app)
-    } else {
-      ray.SeekMusicStream(app.music, 0.0)
-      app.musicTimePlayed = 0.0
-    }
-  }
-  
+  //if ray.IsKeyPressed(.END) || ray.IsKeyPressed(.KP_1) {
+  //  NextSong(app)
+  //} else if ray.IsKeyPressed(.HOME) || ray.IsKeyPressed(.KP_7) {
+  //  if app.musicTimePlayed < 12.0 {
+  //    PrevSong(app)
+  //  } else {
+  //    ray.SeekMusicStream(app.music, 0.0)
+  //    app.musicTimePlayed = 0.0
+  //  }
+  //}
+
   // NOTE: Randomize song order
-  if ray.IsKeyPressed(.R) {
+  if false { //ray.IsKeyPressed(.R) {
     app.playlist.activeSongIdx = 0
     app.musicPause = false
     rand.shuffle(app.playlist.songs[:])
     ChangeLoadedMusicStream(app, 0)
   }
 
-  input.deltaTime = ray.GetFrameTime()
-  input.mousePos = ray.GetMousePosition()
-  input.mouseLeftDown = ray.IsMouseButtonDown(.LEFT)
-  input.mouseLeftReleased = ray.IsMouseButtonReleased(.LEFT)
-  input.mouseWheel = ray.GetMouseWheelMoveV()
-  app.screenWidth = ray.GetScreenWidth()
-  app.screenHeight = ray.GetScreenHeight()
+  //input.deltaTime = ray.GetFrameTime()
+  //input.mousePos = ray.GetMousePosition()
+  //input.mouseLeftDown = ray.IsMouseButtonDown(.LEFT)
+  //input.mouseLeftReleased = ray.IsMouseButtonReleased(.LEFT)
+  //input.mouseWheel = ray.GetMouseWheelMoveV()
+  //app.screenWidth = ray.GetScreenWidth()
+  //app.screenHeight = ray.GetScreenHeight()
 
-  if app.musicLoaded && (ray.IsKeyPressed(.K) || ray.IsKeyPressed(.SPACE)) {
+  if app.musicLoaded && false { //(ray.IsKeyPressed(.K) || ray.IsKeyPressed(.SPACE)) {
     app.musicPause = !app.musicPause
-    if app.musicPause { ray.PauseMusicStream(app.music) }
-    else { ray.ResumeMusicStream(app.music) }
+    //if app.musicPause { ray.PauseMusicStream(app.music) }
+    //else { ray.ResumeMusicStream(app.music) }
   }
 
   //timePlayed := ray.GetMusicTimePlayed(music)/ray.GetMusicTimeLength(music)
@@ -536,14 +532,14 @@ Render :: proc(app: ^AppData, input: ^Input)
 
   // Generate the auto layout for rendering
   //currentTime := ray.GetTime()
-  UIRenderCommands := UI_Calculate(app, input)
+  //UIRenderCommands := UI_Calculate(app, input)
 
-  ray.BeginDrawing()
-  ray.ClearBackground(ray.BLACK)
+  //ray.BeginDrawing()
+  //ray.ClearBackground(ray.BLACK)
 
-  RayUIRender(&UIRenderCommands, &app.fonts[0])
+  //RayUIRender(&UIRenderCommands, &app.fonts[0])
 
-  ray.EndDrawing()
+  //ray.EndDrawing()
 }
 
 @export
@@ -555,20 +551,20 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
 
   free_all(context.temp_allocator)
 
-  shouldQuit := ray.WindowShouldClose()
-  if ray.IsWindowMinimized() {
+  //shouldQuit := ray.WindowShouldClose()
+  if false { // ray.IsWindowMinimized() {
     // TODO: Also decrease fps?
-    ray.UpdateMusicStream(app.music)
-    if !app.musicPause && app.musicLoaded && !ray.IsMusicStreamPlaying(app.music) {
+    //ray.UpdateMusicStream(app.music)
+    if !app.musicPause && app.musicLoaded && false { // !ray.IsMusicStreamPlaying(app.music) {
       newIdx := (app.playlist.activeSongIdx + 1) % len(app.playlist.songs)
       app.playlist.activeSongIdx = newIdx
       ChangeLoadedMusicStream(app, newIdx)
     }
-    ray.BeginDrawing(); ray.EndDrawing() // end frame
+    //ray.BeginDrawing(); ray.EndDrawing() // end frame
   }
   else {
     Update(app, input)
     Render(app, input)
   }
-  return shouldQuit
+  return false
 }

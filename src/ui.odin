@@ -94,7 +94,7 @@ UI_Prepare :: proc(app: ^AppData, input: ^Input)
 
   UI_mousePos := clay.Vector2{input.mousePos.x, input.mousePos.y}
   clay.SetPointerState(UI_mousePos, input.mouseLeftDown && !scrollbarData.mouseDown)
-  clay.SetLayoutDimensions(clay.Dimensions{f32(app.screenWidth), f32(app.screenHeight)})
+  clay.SetLayoutDimensions(clay.Dimensions{f32(app.windowWidth), f32(app.windowHeight)})
   if !input.mouseLeftDown { scrollbarData.mouseDown = false }
 
   if input.mouseLeftDown && !scrollbarData.mouseDown && clay.PointerOver(clay.ID("ScrollBar")) {
@@ -196,7 +196,7 @@ SongSlider :: proc(app: ^AppData, input: ^Input, id: clay.ElementId)
       percentage = (input.mousePos.x - sliderData.boundingBox.x) / sliderData.boundingBox.width
       percentage = clamp(percentage, 0.0, 1.0)
       if input.mouseLeftReleased {
-        ray.SeekMusicStream(app.music, percentage*app.musicTimeLength)
+        //ray.SeekMusicStream(app.music, percentage*app.musicTimeLength)
         app.sliderSelected = ELEMENT_ID_NIL
       }
     }
