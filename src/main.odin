@@ -10,6 +10,7 @@ import "core:path/filepath"
 
 import "core:prof/spall"
 import sdl "vendor:sdl3"
+import "vendor:sdl3/ttf"
 
 DATAFILE_NAME :: "prog.dat"
 
@@ -267,23 +268,33 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
 
 InitSDL3 :: proc(app: ^AppData)
 {
+  spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
   ok := sdl.Init({.VIDEO})
   assert(ok, "Could not init sdl")
 
   app.windowWidth = 1000
   app.windowHeight = 800
-  ok = sdl.CreateWindowAndRenderer("playlist viewer", app.windowWidth, app.windowHeight, {.RESIZABLE}, &app.window, &app.renderer)
-  assert(ok, "Could not create window and renderer")
-}
+  app.window = sdl.CreateWindow("playlist viewer", app.windowWidth, app.windowHeight, {.RESIZABLE})
+  assert(app.window != nil, "Could not create sdl window")
+  app.renderer = sdl.CreateRenderer(app.window, nil)
+  assert(app.renderer != nil, "Could not create sdl renderer")
 
-InitClay :: proc(app: ^AppData)
-{
-  spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-  //app.fonts[Font_Inconsolata] = ray.LoadFontEx("resources/Inconsolata-Regular.ttf", 48, nil, 400)
-  //ray.SetTextureFilter(app.fonts[Font_Inconsolata].texture, .BILINEAR)
-  //app.fonts[Font_LiberationMono] = ray.LoadFontEx("resources/liberation-mono.ttf", 48, nil, 400)
-  //ray.SetTextureFilter(app.fonts[Font_LiberationMono].texture, .BILINEAR)
-  Clay_Init(nil, app.windowWidth, app.windowHeight)
+  ok = ttf.Init()
+  assert(ok, "Could not init sdl_ttf")
+
+  app.clay_renderData.renderer = app.renderer;
+  app.clay_renderData.textEngine = ttf.CreateRendererTextEngine(app.clay_renderData.renderer);
+  assert(app.clay_renderData.textEngine != nil, "Could not create text engine from renderer")
+
+  app.clay_renderData.fonts = make([]^ttf.Font, 2)
+  assert(app.clay_renderData.fonts != nil, "Could not allocate memory for the font array")
+
+  font := ttf.OpenFont("resources/Inconsolata-Regular.ttf", 16);
+  assert(font != nil, "Could not load font")
+  app.clay_renderData.fonts[Font_Inconsolata] = font
+  font = ttf.OpenFont("resources/liberation-mono.ttf", 16);
+  assert(font != nil, "Could not load font")
+  app.clay_renderData.fonts[Font_LiberationMono] = font
 }
 
 @export
@@ -387,7 +398,7 @@ DeInitPartial :: proc(rawApp: rawptr, rawInput: rawptr)
   //app := cast(^AppData)rawApp
   //input := cast(^Input)rawInput
 
-  Clay_Close()
+  //Clay_Close()
 }
 
 @export
@@ -397,7 +408,11 @@ DeInitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   input := cast(^Input)rawInput
   DeInitPartial(rawApp, rawInput)
 
-  //for &f in app.fonts { ray.UnloadFont(f) }
+  ttf.CloseFont(app.clay_renderData.fonts[0])
+  ttf.CloseFont(app.clay_renderData.fonts[1])
+  delete(app.clay_renderData.fonts)
+  ttf.DestroyRendererTextEngine(app.clay_renderData.textEngine)
+  ttf.Quit()
 
   sdl.DestroyRenderer(app.renderer)
   sdl.DestroyWindow(app.window)
@@ -457,6 +472,20 @@ BackTime :: #force_inline proc(app: ^AppData, seconds: f32)
 {
   app.musicTimePlayed = max(app.musicTimePlayed - seconds, 0.06)
   //ray.SeekMusicStream(app.music, app.musicTimePlayed)
+}
+
+GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
+{
+  event: sdl.Event = ---
+  for sdl.PollEvent(&event) {
+    #partial switch event.type {
+      case .QUIT: {
+        shouldQuit = true
+      } break;
+    }
+  }
+
+  return
 }
 
 Update :: proc(app: ^AppData, input: ^Input)
@@ -531,15 +560,14 @@ Render :: proc(app: ^AppData, input: ^Input)
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
   // Generate the auto layout for rendering
-  //currentTime := ray.GetTime()
-  //UIRenderCommands := UI_Calculate(app, input)
+  UIRenderCommands := UI_Calculate(app, input)
 
-  //ray.BeginDrawing()
-  //ray.ClearBackground(ray.BLACK)
+  sdl.SetRenderDrawColor(app.renderer, 0, 0, 0, 255);
+  sdl.RenderClear(app.renderer);
 
-  //RayUIRender(&UIRenderCommands, &app.fonts[0])
+  SDL_RenderClayCommands(&app.clay_renderData, &UIRenderCommands);
 
-  //ray.EndDrawing()
+  sdl.RenderPresent(app.renderer);
 }
 
 @export
@@ -551,7 +579,7 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
 
   free_all(context.temp_allocator)
 
-  //shouldQuit := ray.WindowShouldClose()
+  shouldQuit := GetInput(app, input)
   if false { // ray.IsWindowMinimized() {
     // TODO: Also decrease fps?
     //ray.UpdateMusicStream(app.music)
@@ -566,5 +594,5 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
     Update(app, input)
     Render(app, input)
   }
-  return false
+  return shouldQuit
 }

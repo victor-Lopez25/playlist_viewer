@@ -31,6 +31,7 @@ AppData :: struct {
   window: ^sdl.Window,
   renderer: ^sdl.Renderer,
   windowWidth, windowHeight: i32,
+  clay_renderData: Clay_SDL3RendererData,
 
   volume: f32,
   playlist: Playlist,
@@ -44,7 +45,6 @@ AppData :: struct {
   musicLoaded: bool,
   musicPause: bool,
 
-  //fonts: [2]ray.Font,
   sliderSelected: clay.ElementId,
 
   playlistFileAbsPath: string,
