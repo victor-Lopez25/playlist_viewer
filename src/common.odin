@@ -5,6 +5,9 @@ import "core:prof/spall"
 import clay "clay-odin"
 import sdl "vendor:sdl3"
 
+TARGET_FPS :: 60.0
+TARGET_NS :: 1000000000.0 / TARGET_FPS
+
 SongSourceType :: enum {
   None, /* no song source */
   File, /* song is stored locally */
@@ -59,4 +62,6 @@ Input :: struct {
   mousePos: [2]f32,
   mouseLeftDown: bool,
   mouseLeftReleased: bool,
+
+  keyDown: #sparse[sdl.Scancode]bool,
 }

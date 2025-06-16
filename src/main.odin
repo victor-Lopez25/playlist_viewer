@@ -515,12 +515,15 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
       } break;
 
       case .KEY_DOWN: {
+        input.keyDown[event.key.scancode] = true
+      } break;
 
+      case .KEY_UP: {
+        input.keyDown[event.key.scancode] = false
       } break;
 
       case .MOUSE_WHEEL: {
-        input.mouseWheel.x += event.wheel.x
-        input.mouseWheel.y += event.wheel.y
+        input.mouseWheel += { event.wheel.x, event.wheel.y}
       } break;
     }
   }
@@ -543,12 +546,12 @@ Update :: proc(app: ^AppData, input: ^Input)
   //}
 
   // volume
-  if false { // ray.IsKeyPressed(.UP) {
-    app.volume = min(app.volume + 0.05, 1.0)
+  if input.keyDown[.UP] {
+    app.volume = min(app.volume + 0.005, 1.0)
     //ray.SetMasterVolume(app.volume)
   }
-  if false { // ray.IsKeyPressed(.DOWN) {
-    app.volume = max(app.volume - 0.05, 0.0)
+  if input.keyDown[.DOWN] {
+    app.volume = max(app.volume - 0.005, 0.0)
     //ray.SetMasterVolume(app.volume)
   }
 
@@ -616,6 +619,8 @@ Render :: proc(app: ^AppData, input: ^Input)
 @export
 MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
 {
+  startTicks := sdl.GetTicksNS()
+
   app := cast(^AppData)rawApp
   input := cast(^Input)rawInput
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, "update & render")
@@ -637,5 +642,15 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
     Update(app, input)
     Render(app, input)
   }
+
+  difTicks := f32(sdl.GetTicksNS() - startTicks)
+  if difTicks < TARGET_NS {
+    sdl.DelayNS(u64(TARGET_NS - difTicks))
+  }
+  else {
+    sdl.Log("Missed target fps: %fms", difTicks/1000000.0) // NOTE: Show ms, not ns
+  }
+  input.deltaTime = f32(sdl.GetTicksNS() - startTicks)/1000000.0
+
   return shouldQuit
 }
