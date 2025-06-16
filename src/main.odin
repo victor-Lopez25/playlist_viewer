@@ -1,5 +1,6 @@
 package main
 
+import "base:runtime"
 import "core:os"
 import "core:fmt"
 import "core:sync"
@@ -266,7 +267,7 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
   }
 }
 
-InitSDL3 :: proc(app: ^AppData)
+InitSDL3 :: proc(app: ^AppData, input: ^Input)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
   ok := sdl.Init({.VIDEO})
@@ -295,13 +296,41 @@ InitSDL3 :: proc(app: ^AppData)
   font = ttf.OpenFont("resources/liberation-mono.ttf", 16);
   assert(font != nil, "Could not load font")
   app.clay_renderData.fonts[Font_LiberationMono] = font
+
+  EventFilterData :: struct { app: ^AppData, input: ^Input, Context: runtime.Context }
+  InputEventFilter :: proc "c"(userdata: rawptr, event: ^sdl.Event) -> bool
+  {
+    prog := cast(^EventFilterData)userdata
+    context = prog.Context
+    if(event.type == .WINDOW_RESIZED) {
+      // TODO: Figure out what causes the tearing
+      spall.SCOPED_EVENT(&prog.app.spall_ctx, &prog.app.spall_buffer, "Resize event")
+      prog.app.windowWidth = event.window.data1
+      prog.app.windowHeight = event.window.data2
+
+      UI_Prepare(prog.app, prog.input)
+
+      // Generate the auto layout for rendering
+      UIRenderCommands := UI_Calculate(prog.app, prog.input)
+
+      SDL_RenderClayCommands(&prog.app.clay_renderData, &UIRenderCommands)
+
+      sdl.RenderPresent(prog.app.renderer)
+    }
+    return true
+  }
+  app.eventFilterData.app = app
+  app.eventFilterData.input = input
+  app.eventFilterData.Context = context
+  ok = sdl.AddEventWatch(InputEventFilter, &app.eventFilterData)
+  assert(ok, "Could not add sdl event watch: InputEventFilter")
 }
 
 @export
 InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
 {
   app := cast(^AppData)rawApp
-  //input := cast(^Input)rawInput
+  input := cast(^Input)rawInput
 
   app.spall_ctx = spall.context_create("trace.spall")
   app.spall_backing_buffer = make([]u8, spall.BUFFER_DEFAULT_SIZE)
@@ -372,7 +401,7 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   // volume 1 is way too high
   if app.volume == 0 { app.volume = 0.18 }
 
-  InitSDL3(app)
+  InitSDL3(app, input)
   InitPartial(rawApp, rawInput)
 
   //ray.SetTargetFPS(60)
@@ -476,14 +505,28 @@ BackTime :: #force_inline proc(app: ^AppData, seconds: f32)
 
 GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
 {
+  // reset attributes that accumulate in a single frame
+  input.mouseWheel = 0
   event: sdl.Event = ---
   for sdl.PollEvent(&event) {
     #partial switch event.type {
       case .QUIT: {
         shouldQuit = true
       } break;
+
+      case .KEY_DOWN: {
+
+      } break;
+
+      case .MOUSE_WHEEL: {
+        input.mouseWheel.x += event.wheel.x
+        input.mouseWheel.y += event.wheel.y
+      } break;
     }
   }
+
+  mouseButtonFlags := sdl.GetMouseState(&input.mousePos.x, &input.mousePos.y)
+  input.mouseLeftDown = .LEFT in mouseButtonFlags
 
   return
 }
@@ -562,12 +605,12 @@ Render :: proc(app: ^AppData, input: ^Input)
   // Generate the auto layout for rendering
   UIRenderCommands := UI_Calculate(app, input)
 
-  sdl.SetRenderDrawColor(app.renderer, 0, 0, 0, 255);
-  sdl.RenderClear(app.renderer);
+  sdl.SetRenderDrawColor(app.renderer, 0, 0, 0, 255)
+  sdl.RenderClear(app.renderer)
 
-  SDL_RenderClayCommands(&app.clay_renderData, &UIRenderCommands);
+  SDL_RenderClayCommands(&app.clay_renderData, &UIRenderCommands)
 
-  sdl.RenderPresent(app.renderer);
+  sdl.RenderPresent(app.renderer)
 }
 
 @export

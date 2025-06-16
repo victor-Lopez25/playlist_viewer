@@ -1,5 +1,6 @@
 package main
 
+import "base:runtime"
 import "core:prof/spall"
 import clay "clay-odin"
 import sdl "vendor:sdl3"
@@ -48,6 +49,8 @@ AppData :: struct {
   sliderSelected: clay.ElementId,
 
   playlistFileAbsPath: string,
+
+  eventFilterData: struct { app: ^AppData, input: ^Input, Context: runtime.Context },
 }
 
 Input :: struct {
