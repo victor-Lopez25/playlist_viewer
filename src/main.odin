@@ -3,6 +3,7 @@ package main
 import "base:runtime"
 import "core:os"
 import "core:fmt"
+import "core:mem"
 import "core:sync"
 import "core:slice"
 import "core:strings"
@@ -404,6 +405,8 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   InitSDL3(app, input)
   InitPartial(rawApp, rawInput)
 
+  fmt.println("keydown size:", size_of(input.keyDown))
+
   //ray.SetTargetFPS(60)
   //ray.SetMasterVolume(app.volume)
 
@@ -507,6 +510,8 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
 {
   // reset attributes that accumulate in a single frame
   input.mouseWheel = 0
+  mem.zero(&input.keyPressed[sdl.Scancode(0)], size_of(input.keyPressed))
+
   event: sdl.Event = ---
   for sdl.PollEvent(&event) {
     #partial switch event.type {
@@ -515,6 +520,8 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
       } break;
 
       case .KEY_DOWN: {
+        //if !input.keyDown[event.key.scancode] do input.keyPressed[event.key.scancode] = true
+        input.keyPressed[event.key.scancode] = !input.keyDown[event.key.scancode]
         input.keyDown[event.key.scancode] = true
       } break;
 
@@ -529,7 +536,9 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
   }
 
   mouseButtonFlags := sdl.GetMouseState(&input.mousePos.x, &input.mousePos.y)
-  input.mouseLeftDown = .LEFT in mouseButtonFlags
+  mouseLeftDown := .LEFT in mouseButtonFlags
+  input.mouseLeftReleased = input.mouseLeftDown && !mouseLeftDown
+  input.mouseLeftDown = mouseLeftDown
 
   return
 }
@@ -557,39 +566,31 @@ Update :: proc(app: ^AppData, input: ^Input)
 
   // song control
   //app.musicTimePlayed = ray.GetMusicTimePlayed(app.music)
-  //if ray.IsKeyPressed(.RIGHT) { ForwardTime(app, 5.0) }
-  //else if ray.IsKeyPressed(.LEFT) { BackTime(app, 5.0) }
-  //if ray.IsKeyPressed(.L) { ForwardTime(app, 10.0) }
-  //else if ray.IsKeyPressed(.J) { BackTime(app, 10.0) }
+  if input.keyPressed[.RIGHT] { ForwardTime(app, 5.0) }
+  else if input.keyPressed[.LEFT] { BackTime(app, 5.0) }
+  if input.keyPressed[.L] { ForwardTime(app, 10.0) }
+  else if input.keyPressed[.J] { BackTime(app, 10.0) }
 
-  //if ray.IsKeyPressed(.END) || ray.IsKeyPressed(.KP_1) {
-  //  NextSong(app)
-  //} else if ray.IsKeyPressed(.HOME) || ray.IsKeyPressed(.KP_7) {
-  //  if app.musicTimePlayed < 12.0 {
-  //    PrevSong(app)
-  //  } else {
+  if input.keyPressed[.END] || input.keyPressed[.KP_1] {
+    NextSong(app)
+  } else if input.keyPressed[.HOME] || input.keyPressed[.KP_7] {
+    if app.musicTimePlayed < 12.0 {
+      PrevSong(app)
+    } else {
   //    ray.SeekMusicStream(app.music, 0.0)
-  //    app.musicTimePlayed = 0.0
-  //  }
-  //}
+      app.musicTimePlayed = 0.0
+    }
+  }
 
   // NOTE: Randomize song order
-  if false { //ray.IsKeyPressed(.R) {
+  if input.keyPressed[.R] {
     app.playlist.activeSongIdx = 0
     app.musicPause = false
     rand.shuffle(app.playlist.songs[:])
     ChangeLoadedMusicStream(app, 0)
   }
 
-  //input.deltaTime = ray.GetFrameTime()
-  //input.mousePos = ray.GetMousePosition()
-  //input.mouseLeftDown = ray.IsMouseButtonDown(.LEFT)
-  //input.mouseLeftReleased = ray.IsMouseButtonReleased(.LEFT)
-  //input.mouseWheel = ray.GetMouseWheelMoveV()
-  //app.screenWidth = ray.GetScreenWidth()
-  //app.screenHeight = ray.GetScreenHeight()
-
-  if app.musicLoaded && false { //(ray.IsKeyPressed(.K) || ray.IsKeyPressed(.SPACE)) {
+  if app.musicLoaded && (input.keyPressed[.K] || input.keyPressed[.SPACE]) {
     app.musicPause = !app.musicPause
     //if app.musicPause { ray.PauseMusicStream(app.music) }
     //else { ray.ResumeMusicStream(app.music) }
