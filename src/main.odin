@@ -271,7 +271,7 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
 InitSDL3 :: proc(app: ^AppData, input: ^Input)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-  ok := sdl.Init({.VIDEO})
+  ok := sdl.Init({.AUDIO, .VIDEO}) // NOTE: Any subsystem that isn't video can be initialized in a different thread
   assert(ok, "Could not init sdl")
 
   app.windowWidth = 1000
@@ -325,6 +325,11 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input)
   app.eventFilterData.Context = context
   ok = sdl.AddEventWatch(InputEventFilter, &app.eventFilterData)
   assert(ok, "Could not add sdl event watch: InputEventFilter")
+
+  // Audio
+  sdl.Log("Audio driver: %s", sdl.GetCurrentAudioDriver())
+
+
 }
 
 @export
@@ -405,9 +410,6 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   InitSDL3(app, input)
   InitPartial(rawApp, rawInput)
 
-  fmt.println("keydown size:", size_of(input.keyDown))
-
-  //ray.SetTargetFPS(60)
   //ray.SetMasterVolume(app.volume)
 
   return
