@@ -14,6 +14,8 @@ import "core:prof/spall"
 import sdl "vendor:sdl3"
 import "vendor:sdl3/ttf"
 
+import mix "sdl3_mixer"
+
 DATAFILE_NAME :: "prog.dat"
 
 SortSongData :: proc(songs: []SongData)
@@ -224,10 +226,12 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
+  // TODO: Use LoadMUS_IO ?
+
   playlist := &app.playlist
   if playlist.songs[playlist.activeSongIdx].source != "" {
     if app.musicLoaded {
-      //ray.UnloadMusicStream(app.music)
+      mix.FreeMusic(app.music)
       app.musicLoaded = false
     }
 
@@ -239,21 +243,25 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
       }
       case .File: {
         if os.exists(activeSong.source) {
-          //filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
-          //app.music = ray.LoadMusicStream(filename)
-          //app.music.looping = false
-          //ray.PlayMusicStream(app.music)
-          app.musicLoaded = true
+          filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
+          app.music = mix.LoadMUS(filename)
+          if mix.PlayMusic(app.music, 0) { // 0 loops
+            app.musicLoaded = true
+          } else {
+            fmt.println("Could not play music:", mix.GetError())
+          }
         }
         else {
           b: strings.Builder = strings.builder_make_len_cap(0, 40, context.temp_allocator)
           filepath := fmt.sbprintf(&b, "../songs/%s", activeSong.source)
           if os.exists(filepath) {
-            //file, _ := strings.to_cstring(&b)
-            //app.music = ray.LoadMusicStream(file)
-            //app.music.looping = false
-            //ray.PlayMusicStream(app.music)
-            app.musicLoaded = true
+            file, _ := strings.to_cstring(&b)
+            app.music = mix.LoadMUS(file)
+            if mix.PlayMusic(app.music, 0) { // 0 loops
+              app.musicLoaded = true
+            } else {
+              fmt.println("Could not play music:", mix.GetError())
+            }
           }
           else {
             fmt.println("Could not find song")
@@ -263,7 +271,7 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
     }
 
     // NOTE: Gather 'static' data from app.music here
-    //app.musicTimeLength = ray.GetMusicTimeLength(app.music)
+    app.musicTimeLength = f32(mix.MusicDuration(app.music))
     app.musicTimePlayed = 0.0
   }
 }
@@ -329,7 +337,12 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input)
   // Audio
   sdl.Log("Audio driver: %s", sdl.GetCurrentAudioDriver())
 
+  ok = mix.OpenAudio(0, nil)
+  assert(ok, "Could not open audio device")
 
+  tryInit := mix.InitFlags{.MP3}
+  initFlags := mix.Init(tryInit)
+  assert(tryInit == initFlags, "Could not init sdl3_mixer")
 }
 
 @export
@@ -410,7 +423,8 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   InitSDL3(app, input)
   InitPartial(rawApp, rawInput)
 
-  //ray.SetMasterVolume(app.volume)
+  prevVolume := mix.VolumeMusic(i32(app.volume*128.0))
+  fmt.printfln("prev: %d, now (should be): %d", prevVolume, i32(app.volume*128.0))
 
   return
 }
@@ -447,6 +461,11 @@ DeInitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   delete(app.clay_renderData.fonts)
   ttf.DestroyRendererTextEngine(app.clay_renderData.textEngine)
   ttf.Quit()
+
+  if app.music != nil {
+    mix.FreeMusic(app.music)
+  }
+  mix.Quit()
 
   sdl.DestroyRenderer(app.renderer)
   sdl.DestroyWindow(app.window)
@@ -498,14 +517,14 @@ ForwardTime :: #force_inline proc(app: ^AppData, seconds: f32)
   if app.musicTimePlayed == app.musicTimeLength {
     NextSong(app)
   } else {
-    //ray.SeekMusicStream(app.music, app.musicTimePlayed)
+    mix.SetMusicPosition(f64(app.musicTimePlayed))
   }
 }
 
 BackTime :: #force_inline proc(app: ^AppData, seconds: f32)
 {
   app.musicTimePlayed = max(app.musicTimePlayed - seconds, 0.06)
-  //ray.SeekMusicStream(app.music, app.musicTimePlayed)
+  mix.SetMusicPosition(f64(app.musicTimePlayed))
 }
 
 GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
@@ -552,22 +571,23 @@ Update :: proc(app: ^AppData, input: ^Input)
   //ray.UpdateMusicStream(app.music)
 
   // If the song finished, go to the next
-  //if !app.musicPause && app.musicLoaded && !ray.IsMusicStreamPlaying(app.music) {
-  //  NextSong(app)
-  //}
+  // TODO: app.musicLoaded could be unnecessary here
+  if !app.musicPause && app.musicLoaded && !mix.PlayingMusic() {
+    NextSong(app)
+  }
 
   // volume
   if input.keyDown[.UP] {
     app.volume = min(app.volume + 0.005, 1.0)
-    //ray.SetMasterVolume(app.volume)
+    mix.VolumeMusic(i32(app.volume*128.0))
   }
   if input.keyDown[.DOWN] {
     app.volume = max(app.volume - 0.005, 0.0)
-    //ray.SetMasterVolume(app.volume)
+    mix.VolumeMusic(i32(app.volume*128.0))
   }
 
   // song control
-  //app.musicTimePlayed = ray.GetMusicTimePlayed(app.music)
+  app.musicTimePlayed = f32(mix.GetMusicPosition(app.music))
   if input.keyPressed[.RIGHT] { ForwardTime(app, 5.0) }
   else if input.keyPressed[.LEFT] { BackTime(app, 5.0) }
   if input.keyPressed[.L] { ForwardTime(app, 10.0) }
@@ -579,7 +599,7 @@ Update :: proc(app: ^AppData, input: ^Input)
     if app.musicTimePlayed < 12.0 {
       PrevSong(app)
     } else {
-  //    ray.SeekMusicStream(app.music, 0.0)
+      mix.RewindMusic()
       app.musicTimePlayed = 0.0
     }
   }
@@ -594,8 +614,8 @@ Update :: proc(app: ^AppData, input: ^Input)
 
   if app.musicLoaded && (input.keyPressed[.K] || input.keyPressed[.SPACE]) {
     app.musicPause = !app.musicPause
-    //if app.musicPause { ray.PauseMusicStream(app.music) }
-    //else { ray.ResumeMusicStream(app.music) }
+    if app.musicPause { mix.PauseMusic() }
+    else { mix.ResumeMusic() }
   }
 
   //timePlayed := ray.GetMusicTimePlayed(music)/ray.GetMusicTimeLength(music)

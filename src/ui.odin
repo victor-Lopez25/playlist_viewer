@@ -5,6 +5,7 @@ import "core:prof/spall"
 
 import clay "clay-odin"
 import sdl "vendor:sdl3"
+import mix "sdl3_mixer"
 
 Font_Inconsolata :: 0
 Font_LiberationMono :: 1
@@ -31,17 +32,14 @@ InitClay :: proc(app: ^AppData)
 UI_Prepare :: proc(app: ^AppData, input: ^Input)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-  @static UI_debug := false
   @static scrollbarData: struct {
     clickOrigin, positionOrigin: clay.Vector2,
     mouseDown: bool,
   }
 
   when ODIN_DEBUG {
-    if false {//ray.IsKeyPressed(.D) {
-      UI_debug = !UI_debug
-      clay.SetDebugModeEnabled(UI_debug)
-      // TODO: When new odin bindings, use clay.IsDebugModeEnabled() to see if 'x' has been pressed
+    if input.keyPressed[.D] {
+      clay.SetDebugModeEnabled(!clay.IsDebugModeEnabled())
     }
   }
 
@@ -151,7 +149,7 @@ SongSlider :: proc(app: ^AppData, input: ^Input, id: clay.ElementId)
       percentage = (input.mousePos.x - sliderData.boundingBox.x) / sliderData.boundingBox.width
       percentage = clamp(percentage, 0.0, 1.0)
       if input.mouseLeftReleased {
-        //ray.SeekMusicStream(app.music, percentage*app.musicTimeLength)
+        mix.SetMusicPosition(f64(percentage*app.musicTimeLength))
         app.sliderSelected = ELEMENT_ID_NIL
       }
     }
@@ -235,7 +233,7 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
               clay.TextDynamic(fmt.tprintf("volume: %3.1f%%", 100.0*app.volume), clay.TextConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
             }
             if app.volume != prevVolume {
-              //ray.SetMasterVolume(app.volume)
+              mix.VolumeMusic(i32(app.volume*128.0))
             }
           }
         }
