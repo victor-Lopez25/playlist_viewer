@@ -10,8 +10,6 @@ WARNING: This software is unfinished and subject to change, until any releases a
 
 For planned updates/fixes, see TODO.txt
 
-SDL3 port UNFINISHED. UI should be showing up correctly but no music should be played, since that's not implemented yet.
-
 ## Usage
 
 Right now, the program will keep a trace of various events in a file called 'trace.spall'. I will soon have this be optional, however, last time I checked, it made a 500MB file from a 9h trace.
