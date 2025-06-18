@@ -18,7 +18,7 @@ UI rework:
 [ ] UI colors T-T
 [ ] Possibility for different color themes ?
 
-[ ] Probably no way to do it in raylib, but try to find out if I can keep the music playing while moving/resizing the window ?
+[x] Keep the music playing while moving/resizing the window - sdl3 fixed it
 [ ] Icon (winows only ?)
 
 Performance:
@@ -27,7 +27,7 @@ Performance:
 [ ] ChangeLoadedMusicStream in a different thread so it doesn't stall (it sometimes does for a more than a frame)
 
 Issues:
-[ ] Wrong ui layout when moving from a one screen to another, only if the screens have different aspect ratio (?)
+[x] Wrong ui layout when moving from a one screen to another, only if the screens have different aspect ratio (?) - sdl3 fixed it
 
 Not a priority:
 [ ] UI to sort list order by various properties (artist, alphabetical, ...)
