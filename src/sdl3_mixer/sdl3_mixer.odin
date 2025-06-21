@@ -112,7 +112,7 @@ foreign lib {
   LoadWAV                :: proc(file: cstring) -> ^Chunk ---
   LoadWAV_IO             :: proc(src: ^SDL.IOStream, closeio: bool) -> ^Chunk ---
   LoadMUS                :: proc(file: cstring) -> ^Music ---
-  LoadMUS_IO             :: proc(src: ^SDL.IOStream, closeio: bool) -> ^Chunk ---
+  LoadMUS_IO             :: proc(src: ^SDL.IOStream, closeio: bool) -> ^Music ---
   LoadMUSType_IO         :: proc(src: ^SDL.IOStream, type: MusicType, closeio: bool) -> ^Music ---
   QuickLoad_WAV          :: proc(mem: [^]u8) -> ^Chunk ---
   QuickLoad_RAW          :: proc(mem: [^]u8, len: u32) -> ^Chunk ---

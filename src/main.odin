@@ -222,11 +222,21 @@ ParseSongs_v1 :: proc(data: []u8) -> [dynamic]SongData
   return songs
 }
 
+LoadMusicFromFile :: proc(app: ^AppData, file: cstring)
+{
+  app.music = mix.LoadMUS_IO(sdl.IOFromFile(file, "rb"), true)
+
+  if mix.PlayMusic(app.music, 0) { // 0 loops
+    app.musicLoaded = true
+  } else {
+    // NOTE: If the music could not be played, the music structure will be freed next frame
+    fmt.println("Could not play music:", mix.GetError())
+  }
+}
+
 ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-
-  // TODO: Use LoadMUS_IO ?
 
   playlist := &app.playlist
   if playlist.songs[playlist.activeSongIdx].source != "" {
@@ -242,30 +252,17 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
         assert(false, "unimplemented")
       }
       case .File: {
-        if os.exists(activeSong.source) {
-          filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
-          app.music = mix.LoadMUS(filename)
-          if mix.PlayMusic(app.music, 0) { // 0 loops
-            app.musicLoaded = true
-          } else {
-            fmt.println("Could not play music:", mix.GetError())
-          }
+        b: strings.Builder = strings.builder_make_len_cap(0, 40, context.temp_allocator)
+        filepath := fmt.sbprintf(&b, "../songs/%s", activeSong.source)
+        if os.exists(filepath) {
+          file, _ := strings.to_cstring(&b)
+          LoadMusicFromFile(app, file)
         }
-        else {
-          b: strings.Builder = strings.builder_make_len_cap(0, 40, context.temp_allocator)
-          filepath := fmt.sbprintf(&b, "../songs/%s", activeSong.source)
-          if os.exists(filepath) {
-            file, _ := strings.to_cstring(&b)
-            app.music = mix.LoadMUS(file)
-            if mix.PlayMusic(app.music, 0) { // 0 loops
-              app.musicLoaded = true
-            } else {
-              fmt.println("Could not play music:", mix.GetError())
-            }
-          }
-          else {
-            fmt.println("Could not find song")
-          }
+        else if os.exists(activeSong.source) {
+            filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
+            LoadMusicFromFile(app, filename)
+        } else {
+          fmt.println("Could not find song")
         }
       }
     }
@@ -423,8 +420,7 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   InitSDL3(app, input)
   InitPartial(rawApp, rawInput)
 
-  prevVolume := mix.VolumeMusic(i32(app.volume*128.0))
-  fmt.printfln("prev: %d, now (should be): %d", prevVolume, i32(app.volume*128.0))
+  _ = mix.VolumeMusic(i32(app.volume*128.0))
 
   return
 }
@@ -646,7 +642,7 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
 
   app := cast(^AppData)rawApp
   input := cast(^Input)rawInput
-  spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, "update & render")
+  spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "update & render")
 
   free_all(context.temp_allocator)
 
@@ -665,6 +661,8 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
     Update(app, input)
     Render(app, input)
   }
+
+  spall._buffer_end(&app.spall_ctx, &app.spall_buffer)
 
   difTicks := f32(sdl.GetTicksNS() - startTicks)
   if difTicks < TARGET_NS {
