@@ -47,6 +47,7 @@ AppData :: struct {
   musicTimeLength: f32,
   musicTimePlayed: f32,
   musicSliderValue: f32,
+  musicLooping: bool,
   musicLoaded: bool,
   musicPause: bool,
 

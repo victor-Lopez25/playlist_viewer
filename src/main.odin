@@ -496,9 +496,13 @@ DeInitAll :: proc(rawApp: rawptr, rawInput: rawptr)
 // Utilities
 
 NextSong :: proc(app: ^AppData) {
-  newIdx := (app.playlist.activeSongIdx + 1) % len(app.playlist.songs)
-  app.playlist.activeSongIdx = newIdx
-  ChangeLoadedMusicStream(app, newIdx)
+  if app.musicLooping {
+    mix.PlayMusic(app.music, 0)
+  } else {
+    newIdx := (app.playlist.activeSongIdx + 1) % len(app.playlist.songs)
+    app.playlist.activeSongIdx = newIdx
+    ChangeLoadedMusicStream(app, newIdx)
+  }
 }
 
 PrevSong :: proc(app: ^AppData) {
@@ -598,6 +602,10 @@ Update :: proc(app: ^AppData, input: ^Input)
       mix.RewindMusic()
       app.musicTimePlayed = 0.0
     }
+  }
+
+  if input.keyPressed[.A] { // temporary while there is no UI for this
+    app.musicLooping = !app.musicLooping
   }
 
   // NOTE: Randomize song order
