@@ -64,6 +64,9 @@ Input :: struct {
   mousePos: [2]f32,
   mouseLeftDown: bool,
   mouseLeftReleased: bool,
+  altDown: bool,
+  ctrlDown: bool,
+  shiftDown: bool,
 
   ignoreMissedFPS: bool,
 

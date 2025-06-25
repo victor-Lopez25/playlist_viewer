@@ -570,6 +570,11 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
     }
   }
 
+  keyMod := sdl.GetModState()
+  input.ctrlDown = .LCTRL in keyMod || .RCTRL in keyMod
+  input.shiftDown = .LSHIFT in keyMod || .RSHIFT in keyMod
+  input.altDown = .LALT in keyMod || .RALT in keyMod
+
   mouseButtonFlags := sdl.GetMouseState(&input.mousePos.x, &input.mousePos.y)
   mouseLeftDown := .LEFT in mouseButtonFlags
   input.mouseLeftReleased = input.mouseLeftDown && !mouseLeftDown

@@ -140,7 +140,7 @@ main :: proc() {
   for !quit {
     fileTime, err := os2.last_write_time_by_name(DLL_NAME)
     reload := err == os2.ERROR_NONE && api.modificationTime != fileTime
-    
+
     if reload {
       newApi, newOk := LoadDllProcs(version)
       if newOk {
