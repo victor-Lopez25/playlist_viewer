@@ -162,8 +162,8 @@ SDL_Clay_RenderArc :: proc(rendererData: ^Clay_SDL3RendererData, center: sdl.FPo
   angleStep := (radEnd - radStart) / f32(numCircleSegments)
   thicknessStep: f32 = 0.4 //arbitrary value to avoid overlapping lines. Changing THICKNESS_STEP or numCircleSegments might cause artifacts.
 
-  reserve(&rendererData.arcPoints, numCircleSegments)
-  points := rendererData.arcPoints
+  resize(&rendererData.arcPoints, numCircleSegments + 1)
+  points := rendererData.arcPoints[:]
 
   for t := thicknessStep; t < thickness - thicknessStep; t += thicknessStep {
     clampedRadius := max(radius - t, 1.0)

@@ -273,6 +273,39 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
   }
 }
 
+EventFilterData :: struct { app: ^AppData, input: ^Input, Context: runtime.Context }
+InputEventFilter :: proc "c"(userdata: rawptr, event: ^sdl.Event) -> bool
+{
+  prog := cast(^EventFilterData)userdata
+  context = prog.Context
+
+  UpdateAndRender :: proc(prog: ^EventFilterData, name: string) {
+    // TODO: Figure out what causes the tearing when resizing
+    spall.SCOPED_EVENT(&prog.app.spall_ctx, &prog.app.spall_buffer, name)
+
+    Update(prog.app, prog.input)
+
+    // Generate the auto layout for rendering
+    UIRenderCommands := UI_Calculate(prog.app, prog.input)
+
+    SDL_RenderClayCommands(&prog.app.clay_renderData, &UIRenderCommands)
+
+    sdl.RenderPresent(prog.app.renderer)
+  }
+
+  #partial switch(event.type) {
+    case .WINDOW_RESIZED: {
+      prog.app.windowWidth = event.window.data1
+      prog.app.windowHeight = event.window.data2
+      UpdateAndRender(prog, "Window_Resize Event")
+    } break;
+    case .WINDOW_MOVED: {
+      UpdateAndRender(prog, "Window_Moved Event")
+    } break;
+  }
+  return true
+}
+
 InitSDL3 :: proc(app: ^AppData, input: ^Input)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
@@ -303,28 +336,6 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input)
   assert(font != nil, "Could not load font")
   app.clay_renderData.fonts[Font_LiberationMono] = font
 
-  EventFilterData :: struct { app: ^AppData, input: ^Input, Context: runtime.Context }
-  InputEventFilter :: proc "c"(userdata: rawptr, event: ^sdl.Event) -> bool
-  {
-    prog := cast(^EventFilterData)userdata
-    context = prog.Context
-    if(event.type == .WINDOW_RESIZED) {
-      // TODO: Figure out what causes the tearing
-      spall.SCOPED_EVENT(&prog.app.spall_ctx, &prog.app.spall_buffer, "Resize event")
-      prog.app.windowWidth = event.window.data1
-      prog.app.windowHeight = event.window.data2
-
-      UI_Prepare(prog.app, prog.input)
-
-      // Generate the auto layout for rendering
-      UIRenderCommands := UI_Calculate(prog.app, prog.input)
-
-      SDL_RenderClayCommands(&prog.app.clay_renderData, &UIRenderCommands)
-
-      sdl.RenderPresent(prog.app.renderer)
-    }
-    return true
-  }
   app.eventFilterData.app = app
   app.eventFilterData.input = input
   app.eventFilterData.Context = context
@@ -545,7 +556,6 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
         input.keyPressed[event.key.scancode] = !input.keyDown[event.key.scancode]
         input.keyDown[event.key.scancode] = true
       } break;
-
       case .KEY_UP: {
         input.keyDown[event.key.scancode] = false
       } break;
