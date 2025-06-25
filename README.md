@@ -29,7 +29,7 @@ Right now, the program will keep a trace of various events in a file called 'tra
 ### Building
 Install odinlang if you don't have it: https://odin-lang.org/docs/install/
 
-If on linux/macos you might need to install sdl3_ttf and sdl3_mixer
+If on linux/macos you might need to install sdl3, sdl3_ttf and sdl3_mixer
 
 windows:
 ```console
