@@ -65,6 +65,8 @@ Input :: struct {
   mouseLeftDown: bool,
   mouseLeftReleased: bool,
 
+  ignoreMissedFPS: bool,
+
   keyDown: #sparse[sdl.Scancode]bool,
   keyPressed: #sparse[sdl.Scancode]bool,
 }

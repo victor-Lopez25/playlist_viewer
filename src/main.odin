@@ -297,9 +297,11 @@ InputEventFilter :: proc "c"(userdata: rawptr, event: ^sdl.Event) -> bool
     case .WINDOW_RESIZED: {
       prog.app.windowWidth = event.window.data1
       prog.app.windowHeight = event.window.data2
+      prog.input.ignoreMissedFPS = true
       UpdateAndRender(prog, "Window_Resize Event")
     } break;
     case .WINDOW_MOVED: {
+      prog.input.ignoreMissedFPS = true
       UpdateAndRender(prog, "Window_Moved Event")
     } break;
   }
@@ -345,12 +347,12 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input)
   // Audio
   sdl.Log("Audio driver: %s", sdl.GetCurrentAudioDriver())
 
-  ok = mix.OpenAudio(0, nil)
-  assert(ok, "Could not open audio device")
-
   tryInit := mix.InitFlags{.MP3}
   initFlags := mix.Init(tryInit)
   assert(tryInit == initFlags, "Could not init sdl3_mixer")
+
+  ok = mix.OpenAudio(0, nil)
+  assert(ok, "Could not open audio device")
 }
 
 @export
@@ -472,6 +474,7 @@ DeInitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   if app.music != nil {
     mix.FreeMusic(app.music)
   }
+  mix.CloseAudio()
   mix.Quit()
 
   sdl.DestroyRenderer(app.renderer)
@@ -542,6 +545,7 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
 {
   // reset attributes that accumulate in a single frame
   input.mouseWheel = 0
+  input.ignoreMissedFPS = false
   mem.zero(&input.keyPressed[sdl.Scancode(0)], size_of(input.keyPressed))
 
   event: sdl.Event = ---
@@ -686,7 +690,7 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   if difTicks < TARGET_NS {
     sdl.DelayNS(u64(TARGET_NS - difTicks))
   }
-  else {
+  else if !input.ignoreMissedFPS {
     sdl.Log("Missed target fps: %fms", difTicks/1000000.0) // NOTE: Show ms, not ns
   }
   input.deltaTime = f32(sdl.GetTicksNS() - startTicks)/1000000.0
