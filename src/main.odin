@@ -252,17 +252,18 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
         assert(false, "unimplemented")
       }
       case .File: {
-        b: strings.Builder = strings.builder_make_len_cap(0, 40, context.temp_allocator)
-        filepath := fmt.sbprintf(&b, "../songs/%s", activeSong.source)
-        if os.exists(filepath) {
-          file, _ := strings.to_cstring(&b)
-          LoadMusicFromFile(app, file)
-        }
-        else if os.exists(activeSong.source) {
+        if os.exists(activeSong.source) {
             filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
             LoadMusicFromFile(app, filename)
         } else {
-          fmt.println("Could not find song")
+          b: strings.Builder = strings.builder_make_len_cap(0, 40, context.temp_allocator)
+          filepath := fmt.sbprintf(&b, "../songs/%s", activeSong.source)
+          if os.exists(filepath) {
+            file, _ := strings.to_cstring(&b)
+            LoadMusicFromFile(app, file)
+          } else {
+            fmt.println("Could not find song")
+          }
         }
       }
     }
@@ -276,8 +277,6 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
 AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
 {
   if listFile == nil || listFile == "" do return false
-
-  prevLen := len(app.playlist.songData)
 
   pathinfo: sdl.PathInfo
   ok := sdl.GetPathInfo(listFile, &pathinfo)
@@ -312,7 +311,7 @@ AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
   }
 
   if pathinfo.type == .DIRECTORY {
-    data := ReadDirectoryData{ ctx = context, songData = &app.playlist.songData}
+    data := ReadDirectoryData{ ctx = context, songData = &app.playlist.songData }
     ok = sdl.EnumerateDirectory(listFile, ReadDirectoryFile, &data)
   }
   else {
@@ -328,7 +327,7 @@ AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
 
   if ok {
     resize(&app.playlist.songs, len(app.playlist.songData))
-    for i := prevLen; i < len(app.playlist.songData); i += 1 { app.playlist.songs[i] = &app.playlist.songData[i] }
+    for i := 0; i < len(app.playlist.songData); i += 1 { app.playlist.songs[i] = &app.playlist.songData[i] }
   }
   return ok
 }
@@ -426,8 +425,8 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   app.spall_buffer = spall.buffer_create(app.spall_backing_buffer, u32(sync.current_thread_id()))
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
-  // TODO: Do something smarter for this?
   clistFile: cstring = "songs"
+  //clistFile: cstring = ""
 
   err: os.Error
   data: []u8
@@ -461,6 +460,8 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   InitPartial(rawApp, rawInput)
 
   _ = mix.VolumeMusic(i32(app.volume*128.0))
+
+  rand.reset(4)
 
   return
 }
@@ -739,6 +740,10 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   }
 
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer)
+
+  if app.playlist.activeSongIdx != -1 {
+    //fmt.println("song selected")
+  }
 
   difTicks := f32(sdl.GetTicksNS() - startTicks)
   if difTicks < TARGET_NS {
