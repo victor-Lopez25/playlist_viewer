@@ -273,6 +273,66 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
   }
 }
 
+AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
+{
+  if listFile == nil || listFile == "" do return false
+
+  prevLen := len(app.playlist.songData)
+
+  pathinfo: sdl.PathInfo
+  ok := sdl.GetPathInfo(listFile, &pathinfo)
+  if !ok do return false
+
+  ReadDirectoryData :: struct { ctx: runtime.Context, songData: ^[dynamic]SongData }
+  ReadDirectoryFile :: proc "c"(rawdata: rawptr, dirname, fname: cstring) -> sdl.EnumerationResult
+  {
+    data := cast(^ReadDirectoryData)rawdata
+    context = data.ctx
+
+    name := string(fname)
+    fullpath := filepath.join({string(dirname), name})
+    ext := filepath.ext(name)
+    info: sdl.PathInfo
+    ok := sdl.GetPathInfo(strings.clone_to_cstring(fullpath, context.temp_allocator), &info)
+    if !ok do return .CONTINUE
+
+    if len(ext) > 1 { ext = ext[1:] }
+    if info.type != .DIRECTORY && (ext == "mp3" || ext == "ogg" || ext == "qoa" || ext == "xm" || ext == "mod" || ext == "wav") {
+      song := SongData{
+        group = "",
+        name = strings.clone(filepath.short_stem(name)),
+        album = "",
+        source = fullpath,
+        sourceType = .File,
+      }
+      append(data.songData, song)
+    }
+
+    return .CONTINUE
+  }
+
+  if pathinfo.type == .DIRECTORY {
+    data := ReadDirectoryData{ ctx = context, songData = &app.playlist.songData}
+    ok = sdl.EnumerateDirectory(listFile, ReadDirectoryFile, &data)
+  }
+  else {
+    size: uint
+    rawdata := sdl.LoadFile(listFile, &size)
+    data := slice.from_ptr(cast(^u8)rawdata, int(size))
+    if ok {
+      parsedSongs := ParseSongs(app, data)
+      for s in parsedSongs do append(&app.playlist.songData, s)
+      app.playlistFileAbsPath = listFile
+    }
+  }
+
+  if ok {
+    resize(&app.playlist.songs, len(app.playlist.songData))
+    for i := prevLen; i < len(app.playlist.songData); i += 1 { app.playlist.songs[i] = &app.playlist.songData[i] }
+  }
+  return ok
+}
+
 EventFilterData :: struct { app: ^AppData, input: ^Input, Context: runtime.Context }
 InputEventFilter :: proc "c"(userdata: rawptr, event: ^sdl.Event) -> bool
 {
@@ -367,11 +427,9 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
   // TODO: Do something smarter for this?
-  listFile := "songs"
+  clistFile: cstring = "songs"
 
   err: os.Error
-  ok: bool
-
   data: []u8
   spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "data file parsing")
   if os.exists(DATAFILE_NAME) {
@@ -383,48 +441,17 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   }
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer) // data file parsing
 
-  spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "playlist building")
-  songData: [dynamic]SongData
-  if listFile != "" {
-    if os.is_dir(listFile) {
-      fileInfos: []os.File_Info
-      songDir, ferr := os.open(listFile)
-      assert(ferr == nil, "Could not open directory")
-      // TODO: Read more than the max count of files when exceeded?
-      fileInfos, err = os.read_dir(songDir, 128) // 128 files max
-      assert(err == nil)
-      for fi in fileInfos {
-        ext := filepath.ext(fi.name)
-        if len(ext) > 1 { ext = ext[1:] }
-        if !fi.is_dir && (ext == "mp3" || ext == "ogg" || ext == "qoa" || ext == "xm" || ext == "mod" || ext == "wav") {
-          song := SongData{
-            group = "",
-            name = filepath.short_stem(fi.name),
-            album = "",
-            source = fi.fullpath,
-            sourceType = .File,
-          }
-          append(&songData, song)
-        }
-      }
-    }
-    else {
-      data, ok = os.read_entire_file(listFile)
-      assert(ok)
-      songData = ParseSongs(app, data)
-    }
-  }
+  listFile := string(clistFile)
 
-  songs := make([dynamic]^SongData, len(songData), len(songData))
-  for i := 0; i < len(songData); i += 1 { songs[i] = &songData[i] }
-  app.playlist = Playlist{
-    songData = songData,
-    songs = songs,
-    name = filepath.short_stem(listFile),
-    activeSongIdx = -1,
+  spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "playlist building")
+  AddSongsToList(app, clistFile)
+  app.playlist.activeSongIdx = -1
+  app.playlist.name = filepath.short_stem(listFile)
+
+  if !filepath.is_abs(listFile) {
+    abspath, _ := filepath.abs(listFile, context.temp_allocator)
+    app.playlistFileAbsPath = strings.clone_to_cstring(abspath)
   }
-  app.playlistFileAbsPath = listFile
-  if !filepath.is_abs(listFile) { app.playlistFileAbsPath, _ = filepath.abs(listFile) }
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer) // playlist building
 
   // volume 1 is way too high
@@ -583,11 +610,33 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
   return
 }
 
+OpenFolderCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filter: i32)
+{
+  // NOTE: filter is only used to open files
+  app := cast(^AppData)rawapp
+
+  if filelist == nil {
+    sdl.Log("An error occurred: %s", sdl.GetError())
+    return
+  } else if filelist[0] == nil {
+    sdl.Log("Did not select any file, the dialog was probably cancelled")
+    return
+  }
+
+  context = app.eventFilterData.Context
+
+  for i := 0; filelist[i] != nil; i += 1 {
+    AddSongsToList(app, filelist[i])
+  }
+}
+
 Update :: proc(app: ^AppData, input: ^Input)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
-  //ray.UpdateMusicStream(app.music)
+  if input.ctrlDown && input.keyPressed[.O] {
+    sdl.ShowOpenFolderDialog(OpenFolderCallback, cast(rawptr)app, app.window, ".", true)
+  }
 
   // If the song finished, go to the next
   // TODO: app.musicLoaded could be unnecessary here

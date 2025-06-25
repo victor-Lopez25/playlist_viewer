@@ -53,7 +53,7 @@ AppData :: struct {
 
   sliderSelected: clay.ElementId,
 
-  playlistFileAbsPath: string,
+  playlistFileAbsPath: cstring,
 
   eventFilterData: struct { app: ^AppData, input: ^Input, Context: runtime.Context },
 }
