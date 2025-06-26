@@ -461,7 +461,7 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
 
   _ = mix.VolumeMusic(i32(app.volume*128.0))
 
-  rand.reset(4)
+  rand.reset(0) // NOTE: Debugging purposes
 
   return
 }

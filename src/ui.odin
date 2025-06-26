@@ -191,7 +191,7 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
       }
 
       if clay.UI()({id = clay.ID("SongList"),
-        layout = {layoutDirection = .TopToBottom, padding = {16, 24, 0, 0}, childGap = 6, sizing = {width = sizingGrow0}},
+        layout = {layoutDirection = .TopToBottom, padding = {16, 24, 0, 0}, childGap = 6, sizing = {width = sizingGrow0, height = clay.SizingFit({})}},
         clip = {vertical = true, childOffset = clay.GetScrollOffset()}})
       {
         for songIdx := 0; songIdx < len(playlist.songs); songIdx += 1
