@@ -83,6 +83,28 @@ if not exist "SDL3.dll" (
   )
 )
 
+if not exist "SDL3_ttf.dll" (
+  if exist "%ODIN_PATH%\vendor\sdl3\ttf\SDL3_ttf.dll" (
+    echo SDL3_ttf not found in current directory. Copying from %ODIN_PATH%\vendor\sdl3\ttf\SDL3_ttf.dll
+    copy "%ODIN_PATH%\vendor\sdl3\ttf\SDL3_ttf.dll" .
+    IF %ERRORLEVEL% NEQ 0 goto endbuilderr
+  ) else (
+    echo Please copy SDL3_ttf from <your_odin_compiler>/vendor/sdl3/SDL3_ttf to the same directory as app.exe
+    goto endbuilderr
+  )
+)
+
+if not exist "SDL3_mixer.dll" (
+  if exist "%ODIN_PATH%\vendor\sdl3\mixer\SDL3_mixer.dll" (
+    echo SDL3_mixer.dll not found in current directory. Copying from %ODIN_PATH%\vendor\sdl3\mixer\SDL3_mixer.dll
+    copy "%ODIN_PATH%\vendor\sdl3\mixer\SDL3_mixer.dll" .
+    IF %ERRORLEVEL% NEQ 0 goto endbuilderr
+  ) else (
+    echo Please copy SDL3_mixer.dll from <your_odin_compiler>/vendor/sdl3/SDL3_mixer.dll to the same directory as app.exe
+    goto endbuilderr
+  )
+)
+
 if "%~1"=="run" (
   %EXE%
 )

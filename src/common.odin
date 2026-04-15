@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:prof/spall"
 import clay "clay-odin"
 import sdl "vendor:sdl3"
-import mix "sdl3_mixer"
+import mix "vendor:sdl3/mixer"
 
 TARGET_FPS :: 60.0
 TARGET_NS :: 1000000000.0 / TARGET_FPS
@@ -43,9 +43,11 @@ AppData :: struct {
   spall_backing_buffer: []u8,
   quit: bool,
 
-  music: ^mix.Music,
-  musicTimeLength: f32,
-  musicTimePlayed: f32,
+  mixer: ^mix.Mixer,
+  musicAudio: ^mix.Audio,
+  musicTrack: ^mix.Track,
+  musicTimeLength: sdl.Sint64, /* in frames */
+  musicTimePlayed: sdl.Sint64, /* in frames */
   musicSliderValue: f32,
   musicLooping: bool,
   musicLoaded: bool,

@@ -1,6 +1,8 @@
 package main
 
 import "base:runtime"
+
+import "core:c"
 import "core:os"
 import "core:fmt"
 import "core:mem"
@@ -8,13 +10,13 @@ import "core:sync"
 import "core:slice"
 import "core:strings"
 import "core:math/rand"
-import "core:path/filepath"
+import "core:path/slashpath"
 
 import "core:prof/spall"
+
 import sdl "vendor:sdl3"
 import "vendor:sdl3/ttf"
-
-import mix "sdl3_mixer"
+import mix "vendor:sdl3/mixer"
 
 DATAFILE_NAME :: "prog.dat"
 
@@ -224,13 +226,32 @@ ParseSongs_v1 :: proc(data: []u8) -> [dynamic]SongData
 
 LoadMusicFromFile :: proc(app: ^AppData, file: cstring)
 {
-  app.music = mix.LoadMUS_IO(sdl.IOFromFile(file, "rb"), true)
-
-  if mix.PlayMusic(app.music, 0) { // 0 loops
-    app.musicLoaded = true
+  prevAudio := app.musicAudio
+  app.musicAudio = mix.LoadAudio_IO(app.mixer, sdl.IOFromFile(file, "rb"), 
+                               predecode = false, closeio = true)
+  if app.musicAudio == nil {
+    sdl.Log("Could not load music audio: %s", sdl.GetError())
   } else {
-    // NOTE: If the music could not be played, the music structure will be freed next frame
-    fmt.println("Could not play music:", mix.GetError())
+    if !mix.SetTrackAudio(app.musicTrack, app.musicAudio) {
+      sdl.Log("Could not set track audio: %s", sdl.GetError())
+    } else {
+      ok: bool
+      if prevAudio == nil {
+        ok = mix.PlayTrack(app.musicTrack, 0)
+      } else {
+        ok = mix.ResumeTrack(app.musicTrack)
+      }
+
+      if ok {
+        app.musicLoaded = true
+        if prevAudio != nil {
+          mix.DestroyAudio(prevAudio)
+        }
+      } else {
+        // NOTE: If the music could not be played, the music structure will be freed next frame
+        sdl.Log("Could not resume music: %s", sdl.GetError())
+      }
+    }
   }
 }
 
@@ -241,7 +262,6 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
   playlist := &app.playlist
   if playlist.songs[playlist.activeSongIdx].source != "" {
     if app.musicLoaded {
-      mix.FreeMusic(app.music)
       app.musicLoaded = false
     }
 
@@ -269,7 +289,7 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
     }
 
     // NOTE: Gather 'static' data from app.music here
-    app.musicTimeLength = f32(mix.MusicDuration(app.music))
+    app.musicTimeLength = mix.GetAudioDuration(app.musicAudio)
     app.musicTimePlayed = 0.0
   }
 }
@@ -289,8 +309,8 @@ AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
     context = data.ctx
 
     name := string(fname)
-    fullpath := filepath.join({string(dirname), name})
-    ext := filepath.ext(name)
+    fullpath := slashpath.join({string(dirname), name})
+    ext := slashpath.ext(name)
     info: sdl.PathInfo
     ok := sdl.GetPathInfo(strings.clone_to_cstring(fullpath, context.temp_allocator), &info)
     if !ok do return .CONTINUE
@@ -299,7 +319,7 @@ AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
     if info.type != .DIRECTORY && (ext == "mp3" || ext == "ogg" || ext == "qoa" || ext == "xm" || ext == "mod" || ext == "wav") {
       song := SongData{
         group = "",
-        name = strings.clone(filepath.short_stem(name)),
+        name = strings.clone(os.short_stem(name)),
         album = "",
         source = fullpath,
         sourceType = .File,
@@ -367,61 +387,104 @@ InputEventFilter :: proc "c"(userdata: rawptr, event: ^sdl.Event) -> bool
   return true
 }
 
-InitSDL3 :: proc(app: ^AppData, input: ^Input)
+InitSDL3 :: proc(app: ^AppData, input: ^Input) -> bool
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-  ok := sdl.Init({.AUDIO, .VIDEO}) // NOTE: Any subsystem that isn't video can be initialized in a different thread
-  assert(ok, "Could not init sdl")
+  // NOTE: Any subsystem that isn't video can be initialized in a different thread
+  if !sdl.Init({.AUDIO, .VIDEO}) {
+    sdl.Log("Could not init sdl: %s", sdl.GetError())
+    return false
+  }
+
+  sdl.SetLogPriorities(.VERBOSE)
 
   app.windowWidth = 1000
   app.windowHeight = 800
   app.window = sdl.CreateWindow("playlist viewer", app.windowWidth, app.windowHeight, {.RESIZABLE})
-  assert(app.window != nil, "Could not create sdl window")
+  if app.window == nil {
+    sdl.Log("Could not create sdl window: %s", sdl.GetError())
+    return false
+  }
   app.renderer = sdl.CreateRenderer(app.window, nil)
-  assert(app.renderer != nil, "Could not create sdl renderer")
+  if app.renderer == nil {
+    sdl.Log("Could not create sdl renderer: %s", sdl.GetError())
+    return false
+  }
 
-  ok = ttf.Init()
-  assert(ok, "Could not init sdl_ttf")
+  if !ttf.Init() {
+    sdl.Log("Could not init sdl_ttf: %s", sdl.GetError())
+    return false
+  }
 
   app.clay_renderData.renderer = app.renderer;
   app.clay_renderData.textEngine = ttf.CreateRendererTextEngine(app.clay_renderData.renderer);
-  assert(app.clay_renderData.textEngine != nil, "Could not create text engine from renderer")
-
+  if app.clay_renderData.textEngine == nil {
+    sdl.Log("Could not create text engine from renderer: %s", sdl.GetError())
+    return false
+  }
   app.clay_renderData.fonts = make([]^ttf.Font, 2)
-  assert(app.clay_renderData.fonts != nil, "Could not allocate memory for the font array")
+  if app.clay_renderData.fonts == nil {
+    sdl.Log("Could not allocate memory for font data")
+    return false
+  }
 
   font := ttf.OpenFont("resources/Inconsolata-Regular.ttf", 16);
-  assert(font != nil, "Could not load font")
+  if font == nil {
+    sdl.Log("Could not load font: %s", sdl.GetError())
+    return false
+  }
   app.clay_renderData.fonts[Font_Inconsolata] = font
   font = ttf.OpenFont("resources/liberation-mono.ttf", 16);
-  assert(font != nil, "Could not load font")
+  if font == nil {
+    sdl.Log("Could not load font: %s", sdl.GetError())
+    return false
+  }
   app.clay_renderData.fonts[Font_LiberationMono] = font
 
   app.eventFilterData.app = app
   app.eventFilterData.input = input
   app.eventFilterData.Context = context
-  ok = sdl.AddEventWatch(InputEventFilter, &app.eventFilterData)
-  assert(ok, "Could not add sdl event watch: InputEventFilter")
+  if !sdl.AddEventWatch(InputEventFilter, &app.eventFilterData) {
+    sdl.Log("Could not add sdl event watch: InputEventFilter: %s", sdl.GetError())
+    return false
+  }
 
+  
   // Audio
-  sdl.Log("Audio driver: %s", sdl.GetCurrentAudioDriver())
+  //sdl.Log("Audio driver: %s", sdl.GetCurrentAudioDriver())
+  //sdl.Log("SDL_mixer version: %d", mix.Version())
 
-  tryInit := mix.InitFlags{.MP3}
-  initFlags := mix.Init(tryInit)
-  assert(tryInit == initFlags, "Could not init sdl3_mixer")
+  if !mix.Init() {
+    sdl.Log("Could not init SDL_mixer: %s", sdl.GetError())
+    return false
+  }
 
-  ok = mix.OpenAudio(0, nil)
-  assert(ok, "Could not open audio device")
+  app.mixer = mix.CreateMixerDevice(sdl.AUDIO_DEVICE_DEFAULT_PLAYBACK, nil)
+  if app.mixer == nil {
+    sdl.Log("Could not create mixer device: %s", sdl.GetError())
+    return false
+  }
+
+  app.musicTrack = mix.CreateTrack(app.mixer)
+  if app.musicTrack == nil {
+    sdl.Log("Could not create music track: %s", sdl.GetError())
+    return false
+  }
+  return true
 }
 
 @export
-InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
+AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
 {
   app := cast(^AppData)rawApp
   input := cast(^Input)rawInput
 
   app.spall_ctx = spall.context_create("trace.spall")
   app.spall_backing_buffer = make([]u8, spall.BUFFER_DEFAULT_SIZE)
+  if app.spall_backing_buffer == nil {
+    sdl.Log("Could not allocate spall backing buffer")
+    return false
+  }
   app.spall_buffer = spall.buffer_create(app.spall_backing_buffer, u32(sync.current_thread_id()))
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
@@ -432,8 +495,11 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   data: []u8
   spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "data file parsing")
   if os.exists(DATAFILE_NAME) {
-    data, err = os.read_entire_file_or_err(DATAFILE_NAME)
-    fmt.assertf(err == nil, "Could not read " + DATAFILE_NAME + " file: %v", err)
+    data, err = os.read_entire_file(DATAFILE_NAME, context.temp_allocator)
+    if err != nil {
+      fmt.eprintfln("Could not read " + DATAFILE_NAME + " file: %v", err)
+      return false
+    }
 
     volume := (cast(^f32)&data[0])^
     app.volume = clamp(volume, 0.0, 0.4)
@@ -445,10 +511,10 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "playlist building")
   AddSongsToList(app, clistFile)
   app.playlist.activeSongIdx = -1
-  app.playlist.name = filepath.short_stem(listFile)
+  app.playlist.name = os.short_stem(listFile)
 
-  if !filepath.is_abs(listFile) {
-    abspath, _ := filepath.abs(listFile, context.temp_allocator)
+  if !slashpath.is_abs(listFile) {
+    abspath, _ := os.get_absolute_path(listFile, context.temp_allocator)
     app.playlistFileAbsPath = strings.clone_to_cstring(abspath)
   }
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer) // playlist building
@@ -456,28 +522,38 @@ InitAll :: proc(rawApp: rawptr, rawInput: rawptr)
   // volume 1 is way too high
   if app.volume == 0 { app.volume = 0.18 }
 
-  InitSDL3(app, input)
-  InitPartial(rawApp, rawInput)
+  if !InitSDL3(app, input) {
+    return false
+  }
+  if !AppInitPartial(rawApp, rawInput) {
+    return false
+  }
 
-  _ = mix.VolumeMusic(i32(app.volume*128.0))
+  if !mix.SetMixerGain(app.mixer, app.volume) {
+    sdl.Log("Could not set volume: %s", sdl.GetError())
+  }
 
   rand.reset(0) // NOTE: Debugging purposes
 
-  return
+  return true
 }
 
 @export
-InitPartial :: proc(rawApp: rawptr, rawInput: rawptr)
+AppInitPartial :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
 {
   // Here, startup anything that needs to be restarted each time a new dll is loaded
   app := cast(^AppData)rawApp
   //input := cast(^Input)rawInput
 
-  InitClay(app)
+  if !InitClay(app) {
+    sdl.Log("Could not init clay")
+    return false
+  }
+  return true
 }
 
 @export
-DeInitPartial :: proc(rawApp: rawptr, rawInput: rawptr)
+AppDeInitPartial :: proc(rawApp: rawptr, rawInput: rawptr)
 {
   // Here, close anything that needs to be restarted each time a new dll is loaded
   //app := cast(^AppData)rawApp
@@ -487,22 +563,25 @@ DeInitPartial :: proc(rawApp: rawptr, rawInput: rawptr)
 }
 
 @export
-DeInitAll :: proc(rawApp: rawptr, rawInput: rawptr)
+AppDeInit :: proc(rawApp: rawptr, rawInput: rawptr)
 {
   app := cast(^AppData)rawApp
   input := cast(^Input)rawInput
-  DeInitPartial(rawApp, rawInput)
+  AppDeInitPartial(rawApp, rawInput)
 
   ttf.CloseFont(app.clay_renderData.fonts[0])
   ttf.CloseFont(app.clay_renderData.fonts[1])
   delete(app.clay_renderData.fonts)
   ttf.DestroyRendererTextEngine(app.clay_renderData.textEngine)
   ttf.Quit()
-
-  if app.music != nil {
-    mix.FreeMusic(app.music)
+  
+  if app.musicAudio != nil {
+    mix.DestroyAudio(app.musicAudio)
   }
-  mix.CloseAudio()
+  if app.musicTrack != nil {
+    mix.DestroyTrack(app.musicTrack)
+  }
+  mix.DestroyMixer(app.mixer)
   mix.Quit()
 
   sdl.DestroyRenderer(app.renderer)
@@ -538,13 +617,9 @@ DeInitAll :: proc(rawApp: rawptr, rawInput: rawptr)
 // Utilities
 
 NextSong :: proc(app: ^AppData) {
-  if app.musicLooping {
-    mix.PlayMusic(app.music, 0)
-  } else {
-    newIdx := (app.playlist.activeSongIdx + 1) % len(app.playlist.songs)
-    app.playlist.activeSongIdx = newIdx
-    ChangeLoadedMusicStream(app, newIdx)
-  }
+  newIdx := (app.playlist.activeSongIdx + 1) % len(app.playlist.songs)
+  app.playlist.activeSongIdx = newIdx
+  ChangeLoadedMusicStream(app, newIdx)
 }
 
 PrevSong :: proc(app: ^AppData) {
@@ -555,18 +630,23 @@ PrevSong :: proc(app: ^AppData) {
 
 ForwardTime :: #force_inline proc(app: ^AppData, seconds: f32)
 {
-  app.musicTimePlayed = min(app.musicTimePlayed + seconds, app.musicTimeLength)
+  // TODO: Use TrackMSToFrames or AudioMSToFrames?
+  app.musicTimePlayed = min(app.musicTimePlayed + mix.TrackMSToFrames(app.musicTrack, i64(seconds*1000.0)), app.musicTimeLength)
   if app.musicTimePlayed == app.musicTimeLength {
     NextSong(app)
   } else {
-    mix.SetMusicPosition(f64(app.musicTimePlayed))
+    if !mix.SetTrackPlaybackPosition(app.musicTrack, app.musicTimePlayed) {
+      sdl.Log("Could not set track playback position: %s", sdl.GetError())
+    }
   }
 }
 
 BackTime :: #force_inline proc(app: ^AppData, seconds: f32)
 {
-  app.musicTimePlayed = max(app.musicTimePlayed - seconds, 0.06)
-  mix.SetMusicPosition(f64(app.musicTimePlayed))
+  app.musicTimePlayed = max(app.musicTimePlayed - mix.TrackMSToFrames(app.musicTrack, i64(seconds*1000.0)), 1)
+  if !mix.SetTrackPlaybackPosition(app.musicTrack, app.musicTimePlayed) {
+    sdl.Log("Could not set track playback position: %s", sdl.GetError())
+  }
 }
 
 GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
@@ -641,22 +721,26 @@ Update :: proc(app: ^AppData, input: ^Input)
 
   // If the song finished, go to the next
   // TODO: app.musicLoaded could be unnecessary here
-  if !app.musicPause && app.musicLoaded && !mix.PlayingMusic() {
+  if !app.musicPause && app.musicLoaded && !mix.TrackPlaying(app.musicTrack) {
     NextSong(app)
   }
 
   // volume
   if input.keyDown[.UP] {
     app.volume = min(app.volume + 0.005, 1.0)
-    mix.VolumeMusic(i32(app.volume*128.0))
+    if !mix.SetMixerGain(app.mixer, app.volume) {
+      sdl.Log("Could not set volume: %s", sdl.GetError())
+    }
   }
   if input.keyDown[.DOWN] {
     app.volume = max(app.volume - 0.005, 0.0)
-    mix.VolumeMusic(i32(app.volume*128.0))
+    if !mix.SetMixerGain(app.mixer, app.volume) {
+      sdl.Log("Could not set volume: %s", sdl.GetError())
+    }
   }
 
   // song control
-  app.musicTimePlayed = f32(mix.GetMusicPosition(app.music))
+  app.musicTimePlayed = mix.GetTrackPlaybackPosition(app.musicTrack)
   if input.keyPressed[.RIGHT] { ForwardTime(app, 5.0) }
   else if input.keyPressed[.LEFT] { BackTime(app, 5.0) }
   if input.keyPressed[.L] { ForwardTime(app, 10.0) }
@@ -668,13 +752,22 @@ Update :: proc(app: ^AppData, input: ^Input)
     if app.musicTimePlayed < 12.0 {
       PrevSong(app)
     } else {
-      mix.RewindMusic()
-      app.musicTimePlayed = 0.0
+      if !mix.SetTrackPlaybackPosition(app.musicTrack, 0) {
+        sdl.Log("Could not rewind to start of the track: %s", sdl.GetError())
+      }
+      app.musicTimePlayed = 0
     }
   }
 
   if input.keyPressed[.A] { // temporary while there is no UI for this
     app.musicLooping = !app.musicLooping
+    newloops: c.int
+    if app.musicLooping {
+      newloops = -1
+    }
+    if !mix.SetTrackLoops(app.musicTrack, newloops) {
+      sdl.Log("Could not set music track loops: %s", sdl.GetError())
+    }
   }
 
   // NOTE: Randomize song order
@@ -685,10 +778,17 @@ Update :: proc(app: ^AppData, input: ^Input)
     ChangeLoadedMusicStream(app, 0)
   }
 
+PAUSE_FADE_OUT_FRAMES :: 80
+
   if app.musicLoaded && (input.keyPressed[.K] || input.keyPressed[.SPACE]) {
     app.musicPause = !app.musicPause
-    if app.musicPause { mix.PauseMusic() }
-    else { mix.ResumeMusic() }
+    if app.musicPause {
+      if !mix.StopTrack(app.musicTrack, PAUSE_FADE_OUT_FRAMES) {
+        sdl.Log("Could not stop track: %s", sdl.GetError())
+      }
+    } else if !mix.ResumeTrack(app.musicTrack) {
+      sdl.Log("Could not resume track: %s", sdl.GetError())
+    }
   }
 
   //timePlayed := ray.GetMusicTimePlayed(music)/ray.GetMusicTimeLength(music)
