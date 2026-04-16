@@ -159,39 +159,43 @@ main :: proc()
     paths, err := strings.split_lines(string(stdout), context.temp_allocator)
     fmt.assertf(err == nil, "Could not get memory for odin root paths: %v", err)
 
-    if !os.exists("SDL3" + DLL_EXT) {
-      sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/SDL3" + DLL_EXT, paths[0])
-      if os.exists(sdl_dll_path) {
-        fmt.eprintfln("SDL3" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
-        os_err := os.copy_file(".", sdl_dll_path)
-        fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
-      } else {
-        fmt.eprintfln("Please copy SDL3" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/SDL3" + DLL_EXT + " to the same directory as " + EXECUTABLE)
+    when ODIN_OS == .Windows {
+      // NOTE: SDL3, SDL3_ttf and SDL3_mixer only have bindings on linux, it is not prebuilt, so we depend on system libraries
+      sdl_dll_name := "SDL3.dll" if ODIN_OS == .Windows else "libSDL3.so"
+      if !os.exists("SDL3" + DLL_EXT) {
+        sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/SDL3" + DLL_EXT, paths[0])
+        if os.exists(sdl_dll_path) {
+          fmt.eprintfln("SDL3" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
+          os_err := os.copy_file(".", sdl_dll_path)
+          fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
+        } else {
+          fmt.eprintfln("Please copy SDL3" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/SDL3" + DLL_EXT + " to the same directory as " + EXECUTABLE)
+        }
+      }
+      
+      if !os.exists("SDL3_ttf" + DLL_EXT) {
+        sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/ttf/SDL3_ttf" + DLL_EXT, paths[0])
+        if os.exists(sdl_dll_path) {
+          fmt.eprintfln("SDL3_ttf" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
+          os_err := os.copy_file(".", sdl_dll_path)
+          fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
+        } else {
+          fmt.eprintfln("Please copy SDL3_ttf" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/ttf/SDL3_ttf" + DLL_EXT + " to the same directory as " + EXECUTABLE)
+        }
+      }
+    
+      if !os.exists("SDL3_mixer" + DLL_EXT) {
+        sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/ttf/SDL3_mixer" + DLL_EXT, paths[0])
+        if os.exists(sdl_dll_path) {
+          fmt.eprintfln("SDL3_mixer" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
+          os_err := os.copy_file(".", sdl_dll_path)
+          fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
+        } else {
+          fmt.eprintfln("Please copy SDL3_mixer" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/ttf/SDL3_mixer" + DLL_EXT + " to the same directory as " + EXECUTABLE)
+        }
       }
     }
-
-    if !os.exists("SDL3_ttf" + DLL_EXT) {
-      sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/ttf/SDL3_ttf" + DLL_EXT, paths[0])
-      if os.exists(sdl_dll_path) {
-        fmt.eprintfln("SDL3_ttf" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
-        os_err := os.copy_file(".", sdl_dll_path)
-        fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
-      } else {
-        fmt.eprintfln("Please copy SDL3_ttf" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/ttf/SDL3_ttf" + DLL_EXT + " to the same directory as " + EXECUTABLE)
-      }
-    }
-
-    if !os.exists("SDL3_mixer" + DLL_EXT) {
-      sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/ttf/SDL3_mixer" + DLL_EXT, paths[0])
-      if os.exists(sdl_dll_path) {
-        fmt.eprintfln("SDL3_mixer" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
-        os_err := os.copy_file(".", sdl_dll_path)
-        fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
-      } else {
-        fmt.eprintfln("Please copy SDL3_mixer" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/ttf/SDL3_mixer" + DLL_EXT + " to the same directory as " + EXECUTABLE)
-      }
-    }
-  
+    
     if shouldRun {
       os_err: os.Error
 
