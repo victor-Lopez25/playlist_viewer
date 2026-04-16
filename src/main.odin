@@ -529,7 +529,10 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
     sdl.Log("Could not set volume: %s", sdl.GetError())
   }
 
-  rand.reset(0) // NOTE: Debugging purposes
+  when ODIN_DEBUG {
+    // have seed always be the same number for debug
+    rand.reset(0)
+  }
 
   return true
 }
@@ -702,6 +705,7 @@ OpenFolderCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filter: i32
 
   context = app.eventFilterData.Context
 
+  // TODO: Check extensions at least lol
   for i := 0; filelist[i] != nil; i += 1 {
     AddSongsToList(app, filelist[i])
   }

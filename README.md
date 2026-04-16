@@ -16,17 +16,26 @@ For planned updates/fixes, see TODO.txt
 ./viewer
 ```
 
+### Current keyboard actions
+| Key | Action |
+| :--- | :--- |
+| **Arrow Left** | rewind 5 seconds |
+| **Arrow Right** | advance 5 seconds |
+| **Arrow Up** | increase volume by 0.5% |
+| **Arrow Down** | decrease volume by 0.5% |
+| **Key J** | rewind 10 seconds |
+| **Key L** | advance 10 seconds |
+| **End** | skip to next song in the list |
+| **Keypad 1** | skip to next song in the list |
+| **Home** | rewind to start of song or previous song (if in the first 12 seconds) |
+| **Keypad 7** | rewind to start of song or previous song (if in the first 12 seconds) |
+| **Key R** | randomize song order |
+| **Key A** | enable looping on current song |
+| **Ctrl + O** | open music files directory (will add the music files from the directory to the list) |
+
 When built in debug mode, the program will keep a trace of various events in a file called 'trace.spall'. A 9h trace is about 500MB. **This is disabled in release mode**
 
-### Dependencies
- - odin programming language: https://odin-lang.org/
- - clay layout library (vendored in this project): https://github.com/nicbarker/clay
- - spall profiler (in odin core library): https://github.com/colrdavidson/spall-web
- - sdl3 (vendored in odin): https://wiki.libsdl.org/SDL3/FrontPage
- - sdl3_ttf (vendored in odin): https://wiki.libsdl.org/SDL3_ttf/FrontPage
- - sdl3_mixer (vendored in odin): https://wiki.libsdl.org/SDL3_mixer/FrontPage
-
-### Building
+## Building
 Install odinlang if you don't have it: https://odin-lang.org/docs/install/
 
 If on linux/macos you might need to install sdl3, sdl3_ttf and sdl3_mixer.
@@ -45,3 +54,11 @@ windows/linux/macos: (macos untested!)
 ```console
 odin run . -- [debug|release] [run] [clean]
 ```
+
+### Dependencies
+ - odin programming language: https://odin-lang.org/
+ - clay layout library (vendored in this project): https://github.com/nicbarker/clay
+ - spall profiler (in odin core library): https://github.com/colrdavidson/spall-web
+ - sdl3 (vendored in odin): https://wiki.libsdl.org/SDL3/FrontPage
+ - sdl3_ttf (vendored in odin): https://wiki.libsdl.org/SDL3_ttf/FrontPage
+ - sdl3_mixer (vendored in odin): https://wiki.libsdl.org/SDL3_mixer/FrontPage
