@@ -1,7 +1,7 @@
 package main
 
 import "core:fmt"
-import "core:prof/spall"
+import spall "spall-wrapper"
 
 import clay "clay-odin"
 import sdl "vendor:sdl3"

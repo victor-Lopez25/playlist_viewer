@@ -1,7 +1,7 @@
 package main
 
 import "base:runtime"
-import "core:prof/spall"
+import spall "spall-wrapper"
 import clay "clay-odin"
 import sdl "vendor:sdl3"
 import mix "vendor:sdl3/mixer"

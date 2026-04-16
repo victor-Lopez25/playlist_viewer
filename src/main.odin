@@ -12,7 +12,7 @@ import "core:strings"
 import "core:math/rand"
 import "core:path/slashpath"
 
-import "core:prof/spall"
+import spall "spall-wrapper"
 
 import sdl "vendor:sdl3"
 import "vendor:sdl3/ttf"
@@ -449,7 +449,6 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input) -> bool
     return false
   }
 
-  
   // Audio
   //sdl.Log("Audio driver: %s", sdl.GetCurrentAudioDriver())
   //sdl.Log("SDL_mixer version: %d", mix.Version())
@@ -479,7 +478,12 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   app := cast(^AppData)rawApp
   input := cast(^Input)rawInput
 
-  app.spall_ctx = spall.context_create("trace.spall")
+  ok: bool
+  app.spall_ctx, ok = spall.context_create("trace.spall")
+  if !ok {
+    sdl.Log("Could not create Spall context")
+    return false
+  }
   app.spall_backing_buffer = make([]u8, spall.BUFFER_DEFAULT_SIZE)
   if app.spall_backing_buffer == nil {
     sdl.Log("Could not allocate spall backing buffer")
