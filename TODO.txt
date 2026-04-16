@@ -24,7 +24,7 @@ UI rework:
 Performance:
 [x] Spall measurements
 [ ] Thread pool for thread work, will do when more work on threads is required
-[ ] ChangeLoadedMusicStream in a different thread so it doesn't stall (it sometimes does for a more than a frame)
+[/] ChangeLoadedMusicStream in a different thread so it doesn't stall (it sometimes does for a more than a frame) - sdl3_mixer fixed it being slow
 
 Issues:
 [x] Wrong ui layout when moving from a one screen to another, only if the screens have different aspect ratio (?) - sdl3 fixed it
