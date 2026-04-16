@@ -24,19 +24,14 @@ Right now, the program will keep a trace of various events in a file called 'tra
  - spall profiler (in odin core library): https://github.com/colrdavidson/spall-web
  - sdl3 (vendored in odin): https://wiki.libsdl.org/SDL3/FrontPage
  - sdl3_ttf (vendored in odin): https://wiki.libsdl.org/SDL3_ttf/FrontPage
- - sdl3_mixer (vendored in this project): https://wiki.libsdl.org/SDL3_mixer/FrontPage
+ - sdl3_mixer (vendored in odin): https://wiki.libsdl.org/SDL3_mixer/FrontPage
 
 ### Building
 Install odinlang if you don't have it: https://odin-lang.org/docs/install/
 
 If on linux/macos you might need to install sdl3, sdl3_ttf and sdl3_mixer
 
-windows:
+windows/linux/macos: (macos untested!)
 ```console
-build.bat [run|clean]
-```
-
-linux/macos: (macos untested!)
-```console
-./BUILD.sh [run]
+odin run . -- [debug|release] [run] [clean]
 ```
