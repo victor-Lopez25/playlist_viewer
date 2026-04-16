@@ -13,9 +13,9 @@ DLL_DIR :: OUT_DIRECTORY + "/hotreload"
 when ODIN_OS == .Windows {
   PDBS_ENV_VAR :: "PLAYER_PDB_NUMBER"
   PDBS_DIR :: OUT_DIRECTORY + "/pdbs"
-  EXECUTABLE :: "sp.exe" 
+  EXECUTABLE :: "pv.exe" 
 } else {
-  EXECUTABLE :: "sp"
+  EXECUTABLE :: "pv"
 }
 
 DLL_EXT :: "." + dynlib.LIBRARY_FILE_EXTENSION

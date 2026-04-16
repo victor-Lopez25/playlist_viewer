@@ -1,4 +1,4 @@
-## Song player
+## Playlist Viewer
 
 A program to show playlists and also to play them :)
 
@@ -11,7 +11,7 @@ For planned updates/fixes, see TODO.txt
 ## Usage
 
 ```console
-./sp
+./pv
 ```
 
 ### Current keyboard actions
