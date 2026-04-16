@@ -1,10 +1,8 @@
-## Playlist viewer
+## Song player
 
 A program to show playlists and also to play them :)
 
 The reason why I started making this is so I can actually store a list of songs in a place where youtube or spotify can't remove songs from, locally. I know removing songs is not necessarily because these places want to remove them, sometimes it's the creators themselves. However, I believe youtube/spotify should notify you of such changes in your playlists, and definitely not what they do: "Unavailable videos are hidden"
-
-As a side note, I deleted most of the work done in this project by accident so a lot of it is going to be redone in the first commits and the program used to be more complete
 
 **WARNING**: This software is unfinished and subject to change
 
@@ -13,7 +11,7 @@ For planned updates/fixes, see TODO.txt
 ## Usage
 
 ```console
-./viewer
+./sp
 ```
 
 ### Current keyboard actions

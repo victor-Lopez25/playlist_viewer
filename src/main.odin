@@ -392,7 +392,7 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input) -> bool
 
   app.windowWidth = 1000
   app.windowHeight = 800
-  app.window = sdl.CreateWindow("playlist viewer", app.windowWidth, app.windowHeight, {.RESIZABLE})
+  app.window = sdl.CreateWindow("song player", app.windowWidth, app.windowHeight, {.RESIZABLE})
   if app.window == nil {
     sdl.Log("Could not create sdl window: %s", sdl.GetError())
     return false
