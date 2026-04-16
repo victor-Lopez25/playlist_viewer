@@ -235,21 +235,13 @@ LoadMusicFromFile :: proc(app: ^AppData, file: cstring)
     if !mix.SetTrackAudio(app.musicTrack, app.musicAudio) {
       sdl.Log("Could not set track audio: %s", sdl.GetError())
     } else {
-      ok: bool
-      if prevAudio == nil {
-        ok = mix.PlayTrack(app.musicTrack, 0)
-      } else {
-        ok = mix.ResumeTrack(app.musicTrack)
-      }
-
-      if ok {
+      if mix.PlayTrack(app.musicTrack, 0) {
         app.musicLoaded = true
         if prevAudio != nil {
           mix.DestroyAudio(prevAudio)
         }
       } else {
-        // NOTE: If the music could not be played, the music structure will be freed next frame
-        sdl.Log("Could not resume music: %s", sdl.GetError())
+        sdl.Log("Could not play music: %s", sdl.GetError())
       }
     }
   }
