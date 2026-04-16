@@ -29,7 +29,17 @@ Right now, the program will keep a trace of various events in a file called 'tra
 ### Building
 Install odinlang if you don't have it: https://odin-lang.org/docs/install/
 
-If on linux/macos you might need to install sdl3, sdl3_ttf and sdl3_mixer
+If on linux/macos you might need to install sdl3, sdl3_ttf and sdl3_mixer.
+
+If you want to build from source:
+ - SDL3: https://github.com/libsdl-org/SDL/blob/main/INSTALL.md
+ - SDL3_ttf: https://github.com/libsdl-org/SDL_ttf/blob/main/INSTALL.md
+ - SDL3_mixer: https://github.com/libsdl-org/SDL_mixer/blob/main/INSTALL.md
+
+If you want official releases:
+ - SDL3: https://github.com/libsdl-org/SDL/releases/latest
+ - SDL3_ttf: https://github.com/libsdl-org/SDL_ttf/releases/latest
+ - SDL3_mixer: https://github.com/libsdl-org/SDL_mixer/releases/latest
 
 windows/linux/macos: (macos untested!)
 ```console
