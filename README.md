@@ -6,7 +6,7 @@ The reason why I started making this is so I can actually store a list of songs 
 
 As a side note, I deleted most of the work done in this project by accident so a lot of it is going to be redone in the first commits and the program used to be more complete
 
-WARNING: This software is unfinished and subject to change, until any releases are made in github, it will most likely not be stable
+**WARNING**: This software is unfinished and subject to change
 
 For planned updates/fixes, see TODO.txt
 
