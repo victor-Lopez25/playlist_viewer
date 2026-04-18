@@ -388,7 +388,9 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input) -> bool
     return false
   }
 
-  sdl.SetLogPriorities(.VERBOSE)
+  when ODIN_DEBUG {
+    sdl.SetLogPriorities(.VERBOSE)
+  }
 
   app.windowWidth = 1000
   app.windowHeight = 800
@@ -848,9 +850,11 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   difTicks := f32(sdl.GetTicksNS() - startTicks)
   if difTicks < TARGET_NS {
     sdl.DelayNS(u64(TARGET_NS - difTicks))
-  }
-  else if !input.ignoreMissedFPS {
-    sdl.Log("Missed target fps: %fms", difTicks/1000000.0) // NOTE: Show ms, not ns
+  } else if !input.ignoreMissedFPS {
+    when ODIN_DEBUG {
+      // NOTE: Show ms, not ns
+      sdl.Log("Missed target fps: %fms", difTicks/1000000.0)
+    }
   }
   input.deltaTime = f32(sdl.GetTicksNS() - startTicks)/1000000.0
 
