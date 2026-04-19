@@ -707,7 +707,7 @@ OpenFolderCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filter: i32
 
   context = app.eventFilterData.Context
 
-  // TODO: Check extensions at least lol
+  // NOTE: Extensions get checked in AddsSongsToList
   for i := 0; filelist[i] != nil; i += 1 {
     AddSongsToList(app, filelist[i])
   }
@@ -785,16 +785,13 @@ PAUSE_FADE_OUT_FRAMES :: 80
   if app.musicLoaded && (input.keyPressed[.K] || input.keyPressed[.SPACE]) {
     app.musicPause = !app.musicPause
     if app.musicPause {
-      if !mix.StopTrack(app.musicTrack, PAUSE_FADE_OUT_FRAMES) {
+      if !mix.PauseTrack(app.musicTrack) {
         sdl.Log("Could not stop track: %s", sdl.GetError())
       }
     } else if !mix.ResumeTrack(app.musicTrack) {
       sdl.Log("Could not resume track: %s", sdl.GetError())
     }
   }
-
-  //timePlayed := ray.GetMusicTimePlayed(music)/ray.GetMusicTimeLength(music)
-  //fmt.println(timePlayed)
 
   UI_Prepare(app, input)
 }
@@ -842,10 +839,6 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   }
 
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer)
-
-  if app.playlist.activeSongIdx != -1 {
-    //fmt.println("song selected")
-  }
 
   difTicks := f32(sdl.GetTicksNS() - startTicks)
   if difTicks < TARGET_NS {

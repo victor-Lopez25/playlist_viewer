@@ -14,6 +14,9 @@ Name_Event :: spall.Name_Event
 Pad_Skip :: spall.Pad_Skip
 
 when ODIN_DEBUG {
+  // NOTE: random thing from core:time to avoid error
+  Nanosecond :: time.Duration(1)
+
   BUFFER_DEFAULT_SIZE :: 0x10_0000
   SCOPED_EVENT :: spall.SCOPED_EVENT
   buffer_create :: spall.buffer_create
@@ -21,6 +24,7 @@ when ODIN_DEBUG {
   buffer_flush :: spall.buffer_flush
   context_create_with_scale :: spall.context_create_with_scale
   context_create_with_sleep :: spall.context_create_with_sleep
+  context_destroy :: spall.context_destroy
   _buffer_begin :: spall._buffer_begin
   _buffer_end :: spall._buffer_end
 } else {

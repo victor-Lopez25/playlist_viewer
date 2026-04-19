@@ -200,6 +200,7 @@ SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: 
           sdl.RenderFillRect(rendererData.renderer, &rect)
         }
       } break;
+
       case .Text: {
         config := &rcmd.renderData.text
         font := rendererData.fonts[config.fontId]
@@ -210,6 +211,7 @@ SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: 
         assert(ok)
         ttf.DestroyText(text)
       } break;
+      
       case .Border: {
         config := &rcmd.renderData.border
 
@@ -266,6 +268,7 @@ SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: 
           SDL_Clay_RenderArc(rendererData, {centerX, centerY}, clampedRadii.bottomRight, 0.0, 90.0, f32(config.width.bottom), config.color)
         }
       } break;
+      
       case .ScissorStart: {
         boundingBox := rcmd.boundingBox
         currentClippingRectangle.x = i32(boundingBox.x)
@@ -274,14 +277,17 @@ SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: 
         currentClippingRectangle.h = i32(boundingBox.height)
         sdl.SetRenderClipRect(rendererData.renderer, &currentClippingRectangle)
       } break;
+      
       case .ScissorEnd: {
         sdl.SetRenderClipRect(rendererData.renderer, nil)
       } break;
+      
       case .Image: {
         texture := cast(^sdl.Texture)rcmd.renderData.image.imageData
         dest := sdl.FRect{ rect.x, rect.y, rect.w, rect.h }
         sdl.RenderTexture(rendererData.renderer, texture, nil, &dest)
       } break;
+      
       case .Custom: break; // Nothing here for now...
 
       case .None: fallthrough
