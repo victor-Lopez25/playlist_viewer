@@ -188,8 +188,6 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
 
   playlist := &app.playlist
 
-SONG_ELEMENT_HEIGHT :: 60
-
   clay.BeginLayout()
 
   if clay.UI()({id = clay.ID("OuterContainer"), layout = {sizing = sizingGrow00, padding = clay.PaddingAll(16), childGap = 16}, backgroundColor = {250,250,255,255}}) {
@@ -215,7 +213,7 @@ SONG_ELEMENT_HEIGHT :: 60
 
             colorMultiplier := [4]f32{0.8,0.8,0.8,1.0} if app.playlist.activeSongIdx == songIdx else [4]f32{1.0,1.0,1.0,1.0}
             if clay.UI()({id = clay.ID(playlist.songs[songIdx].name, u32(songIdx)),
-              layout = {sizing = {clay.SizingGrow({}), clay.SizingFixed(SONG_ELEMENT_HEIGHT)}, padding = {16,16,16,16}},
+              layout = {sizing = {clay.SizingGrow({}), clay.SizingGrow({})}, padding = {16,16,16,16}},
               backgroundColor = (clay.Hovered() ? (input.mouseLeftDown ? {176, 90, 34, 255} : {200, 110, 40, 255}) : COLOR_ORANGE)*colorMultiplier}) {
 
               clay.TextDynamic(song.name, clay.TextConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
