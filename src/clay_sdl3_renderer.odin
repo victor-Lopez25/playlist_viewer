@@ -269,6 +269,12 @@ SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: 
         }
       } break;
       
+      case .Image: {
+        texture := cast(^sdl.Texture)rcmd.renderData.image.imageData
+        dest := sdl.FRect{ rect.x, rect.y, rect.w, rect.h }
+        sdl.RenderTexture(rendererData.renderer, texture, nil, &dest)
+      } break;
+
       case .ScissorStart: {
         boundingBox := rcmd.boundingBox
         currentClippingRectangle.x = i32(boundingBox.x)
@@ -277,17 +283,24 @@ SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: 
         currentClippingRectangle.h = i32(boundingBox.height)
         sdl.SetRenderClipRect(rendererData.renderer, &currentClippingRectangle)
       } break;
-      
+
       case .ScissorEnd: {
         sdl.SetRenderClipRect(rendererData.renderer, nil)
       } break;
-      
-      case .Image: {
-        texture := cast(^sdl.Texture)rcmd.renderData.image.imageData
-        dest := sdl.FRect{ rect.x, rect.y, rect.w, rect.h }
-        sdl.RenderTexture(rendererData.renderer, texture, nil, &dest)
+
+      case .OverlayColorStart: {
+        c := rcmd.renderData.overlayColor.color
+        tex := sdl.GetRenderTarget(rendererData.renderer)
+        sdl.SetTextureColorMod(tex.?, u8(c.r), u8(c.g), u8(c.b))
+        sdl.SetTextureAlphaMod(tex.?, u8(c.a))
       } break;
-      
+    
+      case .OverlayColorEnd: {
+        tex := sdl.GetRenderTarget(rendererData.renderer)
+        sdl.SetTextureColorMod(tex.?, 255, 255, 255)
+        sdl.SetTextureAlphaMod(tex.?, 255)
+      } break;
+
       case .Custom: break; // Nothing here for now...
 
       case .None: fallthrough

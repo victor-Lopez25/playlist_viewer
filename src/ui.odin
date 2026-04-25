@@ -119,7 +119,7 @@ GeneralSlider :: proc(app: ^AppData, input: ^Input, sliderDeclaration: SliderDec
 {
   fmt.assertf(sliderDeclaration.value != nil, "nil for value attribute isn't allowed, called from: %v", loc)
   fmt.assertf(sliderDeclaration.id.id != 0, "uninitialized id attribute isn't allowed, called from: %v", loc)
-  if clay.UI()({id = sliderDeclaration.id, layout = {sizing = {sliderDeclaration.width, clay.SizingFixed(30)}, childAlignment = {.Center, .Center}}}) {
+  if clay.UI(sliderDeclaration.id)({layout = {sizing = {sliderDeclaration.width, clay.SizingFixed(30)}, childAlignment = {.Center, .Center}}}) {
     dotSize: f32 = 24
     dotRadius: f32 = 12
     percentage := sliderDeclaration.value^/sliderDeclaration.max
@@ -145,7 +145,7 @@ GeneralSlider :: proc(app: ^AppData, input: ^Input, sliderDeclaration: SliderDec
 // NOTE: This one has a slightly different behaviour
 SongSlider :: proc(app: ^AppData, input: ^Input, id: clay.ElementId)
 {
-  if clay.UI()({id = id, layout = {sizing = {sizingGrow0, clay.SizingFixed(30)}, childAlignment = {.Center, .Center}}}) {
+  if clay.UI(id)({layout = {sizing = {sizingGrow0, clay.SizingFixed(30)}, childAlignment = {.Center, .Center}}}) {
     dotSize: f32 = 24
     percentage := f32(app.musicTimePlayed) / f32(app.musicTimeLength)
     sliderData := clay.GetElementData(id)
@@ -190,19 +190,18 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
 
   clay.BeginLayout()
 
-  if clay.UI()({id = clay.ID("OuterContainer"), layout = {sizing = sizingGrow00, padding = clay.PaddingAll(16), childGap = 16}, backgroundColor = {250,250,255,255}}) {
-    if clay.UI()({id = clay.ID("SideBar"),
-                  layout = {layoutDirection = .TopToBottom, sizing = {width = clay.SizingFixed(300), height = clay.SizingGrow({})}, padding = {0, 0, 0, 16}, childGap = 16},
-                  backgroundColor = COLOR_LIGHT})
+  if clay.UI(clay.ID("OuterContainer"))({layout = {sizing = sizingGrow00, padding = clay.PaddingAll(16), childGap = 16}, backgroundColor = {250,250,255,255}}) {
+    if clay.UI(clay.ID("SideBar"))({layout = {
+        layoutDirection = .TopToBottom, sizing = {width = clay.SizingFixed(300), height = clay.SizingGrow({})}, padding = {0, 0, 0, 16}, childGap = 16},
+        backgroundColor = COLOR_LIGHT})
     {
-      if clay.UI()({id = clay.ID("Playlist"), layout = {layoutDirection = .TopToBottom, padding = {16,16,16,16}, sizing = sizingGrow00}, backgroundColor = COLOR_ORANGE}) {
-        clay.TextDynamic(playlist.name, clay.TextConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
+      if clay.UI(clay.ID("Playlist"))({layout = {layoutDirection = .TopToBottom, padding = {16,16,16,16}, sizing = sizingGrow00}, backgroundColor = COLOR_ORANGE}) {
+        clay.Text(playlist.name, clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
         songCountText := fmt.tprintf("%d songs", len(playlist.songs))
-        clay.TextDynamic(songCountText, clay.TextConfig({fontSize = 12, textColor = {0, 0, 0, 255}}))
+        clay.Text(songCountText, clay.TextElementConfig({fontSize = 12, textColor = {0, 0, 0, 255}}))
       }
 
-      if clay.UI()({id = clay.ID("SongList"),
-        layout = { layoutDirection = .TopToBottom, padding = {16, 24, 0, 0}, childGap = 6, sizing = {width = sizingGrow0, height = sizingGrow0 }}, //clay.SizingFit({})}},
+      if clay.UI(clay.ID("SongList"))({layout = { layoutDirection = .TopToBottom, padding = {16, 24, 0, 0}, childGap = 6, sizing = {width = sizingGrow0, height = sizingGrow0 }}, //clay.SizingFit({})}},
         clip = {vertical = true, childOffset = clay.GetScrollOffset()}})
       {
 //        for i:=0;i<5;i+=1 {
@@ -212,24 +211,23 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
             song := playlist.songs[songIdx]
 
             colorMultiplier := [4]f32{0.8,0.8,0.8,1.0} if app.playlist.activeSongIdx == songIdx else [4]f32{1.0,1.0,1.0,1.0}
-            if clay.UI()({id = clay.ID(playlist.songs[songIdx].name, u32(songIdx)),
-              layout = {sizing = {clay.SizingGrow({}), clay.SizingGrow({})}, padding = {16,16,16,16}},
+            if clay.UI(clay.ID(playlist.songs[songIdx].name, u32(songIdx)))({layout = {sizing = {clay.SizingGrow({}), clay.SizingGrow({})}, padding = {16,16,16,16}},
               backgroundColor = (clay.Hovered() ? (input.mouseLeftDown ? {176, 90, 34, 255} : {200, 110, 40, 255}) : COLOR_ORANGE)*colorMultiplier}) {
 
-              clay.TextDynamic(song.name, clay.TextConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
+              clay.Text(song.name, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
             }
           }
   //      }
       }
     }
 
-    if clay.UI()({id = clay.ID("ActiveSongContainer"), layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, padding = {16, 16, 16, 16}, childGap = 16}, backgroundColor = COLOR_LIGHT}) {
+    if clay.UI(clay.ID("ActiveSongContainer"))({layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, padding = {16, 16, 16, 16}, childGap = 16}, backgroundColor = COLOR_LIGHT}) {
       if playlist.activeSongIdx != -1 {
         activeSong := playlist.songs[playlist.activeSongIdx]
-        clay.TextDynamic(activeSong.name, clay.TextConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
-        clay.TextDynamic(activeSong.group, clay.TextConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
+        clay.Text(activeSong.name, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
+        clay.Text(activeSong.group, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
         if app.musicLoaded {
-          if clay.UI()({id = clay.ID("MusicInfo"), layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, padding = {16, 16, 16, 16}, childGap = 8}, backgroundColor = COLOR_ORANGE}) {
+          if clay.UI(clay.ID("MusicInfo"))({layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, padding = {16, 16, 16, 16}, childGap = 8}, backgroundColor = COLOR_ORANGE}) {
             musicLenSecs := mix.AudioFramesToMS(app.musicAudio, sdl.Sint64(app.musicTimeLength)) / 1000
             musicLenMins := musicLenSecs / 60
             musicLenSecs %= 60
@@ -238,7 +236,7 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
             musicPlayedSecs %= 60
             // NOTE: IMPORTANT: I don't like how this looks, I will for sure do another pass on the ui
             musicText := fmt.tprintf("%2d:%2d/%2d:%2d", musicPlayedMins, musicPlayedSecs, musicLenMins, musicLenSecs)
-            clay.TextDynamic(musicText, clay.TextConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
+            clay.Text(musicText, clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
 
 
             if clay.UI()({layout = {sizing = {sizingGrow0, clay.SizingFit({})}, padding = {4, 4, 0, 0}}}) {
@@ -248,7 +246,7 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
             prevVolume := app.volume
             if clay.UI()({layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, childAlignment = {.Right, .Bottom}}}) {
               GeneralSlider(app, input, {id = clay.ID("volumeSlider"), width = clay.SizingPercent(0.4), max = 1.0, value = &app.volume})
-              clay.TextDynamic(fmt.tprintf("volume: %3.1f%%", 100.0*app.volume), clay.TextConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
+              clay.Text(fmt.tprintf("volume: %3.1f%%", 100.0*app.volume), clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
             }
             if app.volume != prevVolume {
               if !mix.SetMixerGain(app.mixer, app.volume) {
@@ -263,16 +261,15 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
 
   scrollData := clay.GetScrollContainerData(GetElementId("SongList"))
   if scrollData.found {
-    if clay.UI()({id = clay.ID("ScrollBar"), floating = {attachTo = .ElementWithId,
+    if clay.UI(clay.ID("ScrollBar"))({floating = {attachTo = .ElementWithId,
       offset = {0, -(scrollData.scrollPosition.y/scrollData.contentDimensions.height) * scrollData.scrollContainerDimensions.height},
       zIndex = 1, parentId = GetElementId("SongList").id, attachment = {element = .RightTop, parent = .RightTop}}})
     {
-      if clay.UI()({id = clay.ID("ScrollBarButton"),
-        layout = {sizing = {clay.SizingFixed(12), clay.SizingFixed((scrollData.scrollContainerDimensions.height/scrollData.contentDimensions.height)*scrollData.scrollContainerDimensions.height)}},
+      if clay.UI(clay.ID("ScrollBarButton"))({layout = {sizing = {clay.SizingFixed(12), clay.SizingFixed((scrollData.scrollContainerDimensions.height/scrollData.contentDimensions.height)*scrollData.scrollContainerDimensions.height)}},
         backgroundColor = clay.PointerOver(clay.ID("ScrollBar")) ? {100, 100, 140, 150} : {120, 120, 160, 150},
         cornerRadius = clay.CornerRadiusAll(6)}) {}
     }
   }
 
-  return clay.EndLayout()
+  return clay.EndLayout(input.deltaTime)
 }
