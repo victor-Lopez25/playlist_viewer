@@ -1,4 +1,4 @@
-[ ] Actual error messages
+[/] Better error messages
 [ ] Improve parser to show errors
 [ ] Different thing for active song and playing song, so I can check out info on a song that
     I'm not playing and if I go back to the playing song it doesn't start over
