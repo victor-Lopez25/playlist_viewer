@@ -18,7 +18,7 @@ import sdl "vendor:sdl3"
 import "vendor:sdl3/ttf"
 import mix "vendor:sdl3/mixer"
 
-DATAFILE_NAME :: "prog.dat"
+CONFIG_FILE_NAME :: "pv.cfg"
 
 SortSongData :: proc(songs: []SongData)
 {
@@ -59,6 +59,15 @@ SortSongData :: proc(songs: []SongData)
   }
 }
 
+CheckMusicFileExt :: proc(ext: string, include_dot: bool) -> bool
+{
+  if(include_dot) {
+    return (ext == ".mp3" || ext == ".ogg" || ext == ".qoa" || ext == ".xm" || ext == ".mod" || ext == ".wav")
+  } else {
+    return (ext == "mp3" || ext == "ogg" || ext == "qoa" || ext == "xm" || ext == "mod" || ext == "wav")
+  }
+}
+
 CountSongs :: proc(songs: []SongData)
 {
   prevGroup := songs[0].group
@@ -88,140 +97,37 @@ PrintSongs :: proc(songs: []SongData)
   }
 }
 
-ParseSingleSong :: proc(text: ^string) -> (SongData, bool)
-{
-  TrimQuotesAndCommaIfPresent :: #force_inline proc(text: string) -> string
-  {
-    // accept no comma
-    if text[len(text)-1] == ',' {
-      return text[1:len(text) - 2]
-    }
-    else {
-      return text[1:len(text) - 1]
-    }
-  }
-
-  song: SongData
-  nok := false
-  foundEnd := false
-  for line in strings.split_lines_iterator(text)
-  {
-    if strings.has_prefix(line, "}") {
-      foundEnd = true
-      break
-    }
-
-    trimmedLine := strings.trim_space(line)
-    if strings.has_prefix(trimmedLine, "group:") {
-      trimmedLine = strings.trim_space(trimmedLine[len("group:"):])
-      trimmedLine = TrimQuotesAndCommaIfPresent(trimmedLine)
-      song.group = trimmedLine
-    }
-    else if strings.has_prefix(trimmedLine, "song:") {
-      trimmedLine = strings.trim_space(trimmedLine[len("song:"):])
-      trimmedLine = TrimQuotesAndCommaIfPresent(trimmedLine)
-      song.name = trimmedLine
-    }
-    else if strings.has_prefix(trimmedLine, "source:") {
-      trimmedLine = strings.trim_space(trimmedLine[len("source:"):])
-      trimmedLine = TrimQuotesAndCommaIfPresent(trimmedLine)
-      song.source = trimmedLine
-    }
-    else if strings.has_prefix(trimmedLine, "sourceType:") {
-      trimmedLine = strings.trim_space(trimmedLine[len("sourceType:"):])
-      if trimmedLine[len(trimmedLine)-1] == ',' {
-        trimmedLine = trimmedLine[:len(trimmedLine)-1]
-      }
-      if trimmedLine == "File" { song.sourceType = .File }
-      else if trimmedLine == "Link" { song.sourceType = .Link }
-      else {
-        // TODO: better error msg
-        fmt.println("Unknown source type")
-        nok = true
-      }
-    }
-  }
-  // TODO: error msg (not found end)
-  nok = nok || !foundEnd
-  return song, !nok
-}
-
-ParseSongs :: proc(app: ^AppData, data: []u8) -> [dynamic]SongData
+ParseSongs :: proc(app: ^AppData, data: []u8)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
-  songs: [dynamic]SongData
 
   source := string(data)
+  lineIdx := 0
+  for line in strings.split_lines_iterator(&source) {
+    lineIdx += 1
+    // NOTE: Ignore empty lines which might be inserted for whatever reason
+    if line == "" do continue
 
-  startList := false
-  for line in strings.split_lines_iterator(&source)
-  {
-    if strings.has_prefix(line, "main list:") {
-      assert(!startList)
-      startList = true
+    if !os.exists(line) {
+      sdl.Log("Error in line %d: Could not find music file '%s', ignoring this file...", lineIdx, line)
       continue
     }
-    if line == "" do startList = false
-    if !startList do continue
 
-    if !strings.has_prefix(line, "{") {
-      // TODO: better error msg
-      fmt.println("parse error")
-      break
-    }
-    song, ok := ParseSingleSong(&source)
-    if !ok {
-      // TODO: better error msg
-      fmt.println("parse error")
-      break
-    }
-    //fmt.printfln("[\n  group: \"%s\"\n  song: \"%s\"\n  source: \"%s\"\n  sourceType: %v\n]", song.group, song.name, song.source, song.sourceType)
-    append(&songs, song)
-  }
-
-  return songs
-}
-
-ParseSongs_v1 :: proc(data: []u8) -> [dynamic]SongData
-{
-  songs: [dynamic]SongData
-
-  source := string(data)
-
-  startList := false
-  for line in strings.split_lines_iterator(&source)
-  {
-    if strings.has_prefix(line, "main list:") {
-      assert(!startList)
-      startList = true
+    if !CheckMusicFileExt(os.ext(line), include_dot = true) {
+      sdl.Log("Error in line %d: '%s' is not a music file, ignoring this file...", lineIdx, line)
       continue
     }
-    if line == "" do startList = false
-    if !startList do continue
 
-    songName, sep, album, group: string
-    songName, sep, album = strings.partition(line, " - ")
-    album, sep, group = strings.partition(album, " - ")
-    if group == "" {
-      group = album
-      album = ""
+    song := SongData {
+      // NOTE: group and album should be figured out from metadata, probably
+      group = "",
+      album = "",
+      name = os.short_stem(line),
+      source = line,
+      sourceType = .File,
     }
-
-    //fmt.printfln("%s - %s - %s", group, album, songName)
-
-    song : SongData = {
-      name = songName,
-      group = group,
-      album = album,
-    }
-    fmt.printfln("%c\n  group: \"%s\"\n  song: \"%s\"\n},", '{', song.group, song.name)
-    append(&songs, song)
+    append(&app.playlist.songData, song)
   }
-
-  // PrintSongs(songs[:])
-  // CountSongs(songs[:])
-
-  return songs
 }
 
 LoadMusicFromFile :: proc(app: ^AppData, file: cstring)
@@ -308,7 +214,7 @@ AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
     if !ok do return .CONTINUE
 
     if len(ext) > 1 { ext = ext[1:] }
-    if info.type != .DIRECTORY && (ext == "mp3" || ext == "ogg" || ext == "qoa" || ext == "xm" || ext == "mod" || ext == "wav") {
+    if info.type != .DIRECTORY && CheckMusicFileExt(ext, include_dot = false) {
       song := SongData{
         group = "",
         name = strings.clone(os.short_stem(name)),
@@ -325,21 +231,21 @@ AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
   if pathinfo.type == .DIRECTORY {
     data := ReadDirectoryData{ ctx = context, songData = &app.playlist.songData }
     ok = sdl.EnumerateDirectory(listFile, ReadDirectoryFile, &data)
-  }
-  else {
+  } else {
     size: uint
     rawdata := sdl.LoadFile(listFile, &size)
     data := slice.from_ptr(cast(^u8)rawdata, int(size))
     if ok {
-      parsedSongs := ParseSongs(app, data)
-      for s in parsedSongs do append(&app.playlist.songData, s)
+      ParseSongs(app, data)
       app.playlistFileAbsPath = listFile
     }
   }
 
   if ok {
     resize(&app.playlist.songs, len(app.playlist.songData))
-    for i := 0; i < len(app.playlist.songData); i += 1 { app.playlist.songs[i] = &app.playlist.songData[i] }
+    for i := 0; i < len(app.playlist.songData); i += 1 {
+      app.playlist.songs[i] = &app.playlist.songData[i]
+    }
   }
   return ok
 }
@@ -466,6 +372,49 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input) -> bool
   return true
 }
 
+ParseConfigFile :: proc(rawData: []u8) -> (ConfigFileInfo, bool)
+{
+  data := (cast(^ConfigFileInfo)(&rawData[0]))^
+
+  // 4096 = path max I'm using, could be more?
+  data.defaultSongDirectory = 
+    strings.string_from_null_terminated_ptr(&rawData[data.header.stringTableOffset], 4096)
+
+  currPlaylistOffset := data.header.stringTableOffset + u32(len(data.defaultSongDirectory)) + 1
+
+  data.currentSongPlaylist = strings.string_from_null_terminated_ptr(&rawData[currPlaylistOffset], 4096)
+
+  return data, true
+}
+
+SerializeConfigFile :: proc(app: ^AppData, f: ^os.File)
+{
+  app.defaultConfig.header.stringTableOffset = size_of(app.defaultConfig.header)
+  app.defaultConfig.header.volume = app.volume
+
+  header := slice.bytes_from_ptr(&app.defaultConfig, size_of(app.defaultConfig.header))
+  bytesWritten, err := os.write(f, header)
+  if err != nil || bytesWritten != size_of(app.defaultConfig.header) {
+    fmt.eprintfln("Could not write header into config file: %v", err)
+    return
+  }
+
+  cstringEnd := [1]u8{0}
+  fmt.fprint(f, app.defaultConfig.defaultSongDirectory)
+  bytesWritten, err = os.write(f, cstringEnd[:])
+  if err != nil || bytesWritten != 1 {
+    fmt.eprintfln("Could not write string end into config file: %v", err)
+    return
+  }
+
+  fmt.fprint(f, app.defaultConfig.currentSongPlaylist)
+  bytesWritten, err = os.write(f, cstringEnd[:])
+  if err != nil || bytesWritten != 1 {
+    fmt.eprintfln("Could not write string end into config file: %v", err)
+    return
+  }
+}
+
 @export
 AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
 {
@@ -486,28 +435,38 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   app.spall_buffer = spall.buffer_create(app.spall_backing_buffer, u32(sync.current_thread_id()))
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
-  clistFile: cstring = "songs"
-  //clistFile: cstring = ""
-
   err: os.Error
   data: []u8
-  spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "data file parsing")
-  if os.exists(DATAFILE_NAME) {
-    data, err = os.read_entire_file(DATAFILE_NAME, context.temp_allocator)
+  spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "config file parsing")
+  if os.exists(CONFIG_FILE_NAME) {
+    data, err = os.read_entire_file(CONFIG_FILE_NAME, context.allocator)
     if err != nil {
-      fmt.eprintfln("Could not read " + DATAFILE_NAME + " file: %v", err)
+      fmt.eprintfln("Could not read " + CONFIG_FILE_NAME + " file: %v", err)
       return false
     }
 
-    volume := (cast(^f32)&data[0])^
-    app.volume = clamp(volume, 0.0, 0.4)
+    app.defaultConfig, _ = ParseConfigFile(data)
+  } else {
+    app.defaultConfig.header.volume = 0.15
+    app.defaultConfig.defaultSongDirectory = "songs"
+    app.defaultConfig.currentSongPlaylist = "lists/NCS.list"
   }
-  spall._buffer_end(&app.spall_ctx, &app.spall_buffer) // data file parsing
+  app.volume = clamp(app.defaultConfig.header.volume, 0.0, 0.4)
+  spall._buffer_end(&app.spall_ctx, &app.spall_buffer) // config file parsing
 
-  listFile := string(clistFile)
+  listFile := app.defaultConfig.currentSongPlaylist
 
   spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "playlist building")
-  AddSongsToList(app, clistFile)
+  data, err = os.read_entire_file(listFile, context.allocator)
+  if err != nil {
+    fmt.eprintfln("Could not read %s file: %v", listFile, err)
+    return false
+  }
+  ParseSongs(app, data)
+  resize(&app.playlist.songs, len(app.playlist.songData))
+  for i := 0; i < len(app.playlist.songData); i += 1 {
+    app.playlist.songs[i] = &app.playlist.songData[i]
+  }
   app.playlist.activeSongIdx = -1
   app.playlist.name = os.short_stem(listFile)
 
@@ -516,9 +475,6 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
     app.playlistFileAbsPath = strings.clone_to_cstring(abspath)
   }
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer) // playlist building
-
-  // volume 1 is way too high
-  if app.volume == 0 { app.volume = 0.18 }
 
   if !InitSDL3(app, input) {
     return false
@@ -590,14 +546,11 @@ AppDeInit :: proc(rawApp: rawptr, rawInput: rawptr)
   sdl.Quit()
 
   {
-    //playlistAbsPathData := transmute([]u8)app.playlistFileAbsPath
-    bytesWritten: int = ---
-    dF, err := os.open(DATAFILE_NAME, os.O_TRUNC | os.O_CREATE)
-    fmt.assertf(err == nil, "Could not open file: %s: %v", DATAFILE_NAME, err)
-    bytesWritten, err = os.write(dF, slice.bytes_from_ptr(&app.volume, size_of(app.volume)))
-    if err != nil {
-      fmt.eprintfln("Could not write data into datafile: %v", err)
-    }
+    dF, err := os.open(CONFIG_FILE_NAME, os.O_TRUNC | os.O_CREATE)
+    fmt.assertf(err == nil, "Could not open file: %s: %v", CONFIG_FILE_NAME, err)
+
+    SerializeConfigFile(app, dF)
+
     os.close(dF)
   }
 
@@ -774,10 +727,12 @@ Update :: proc(app: ^AppData, input: ^Input)
 
   // NOTE: Randomize song order
   if input.keyPressed[.R] {
-    app.playlist.activeSongIdx = 0
     app.musicPause = false
     rand.shuffle(app.playlist.songs[:])
-    ChangeLoadedMusicStream(app, 0)
+    if app.playlist.activeSongIdx != -1 {
+      app.playlist.activeSongIdx = 0
+      ChangeLoadedMusicStream(app, 0)
+    }
   }
 
 PAUSE_FADE_OUT_FRAMES :: 80

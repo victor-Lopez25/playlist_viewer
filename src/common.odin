@@ -21,6 +21,18 @@ SongData :: struct {
   sourceType: SongSourceType,
 }
 
+ConfigHeader :: struct {
+  stringTableOffset: u32,
+  volume: f32,
+}
+
+ConfigFileInfo :: struct {
+  header: ConfigHeader,
+
+  defaultSongDirectory: string,
+  currentSongPlaylist: string,
+}
+
 Playlist :: struct {
   songData: [dynamic]SongData, // NOTE: Should keep original order
   songs: [dynamic]^SongData,
@@ -38,6 +50,7 @@ AppData :: struct {
   windowWidth, windowHeight: i32,
   clay_renderData: Clay_SDL3RendererData,
 
+  defaultConfig: ConfigFileInfo,
   volume: f32,
   playlist: Playlist,
   spall_backing_buffer: []u8,
