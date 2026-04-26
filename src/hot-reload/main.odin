@@ -6,7 +6,6 @@ import "core:mem"
 import "core:fmt"
 import "core:time"
 import "core:dynlib"
-import "core:path/filepath"
 
 DLL_DIR :: "bin/hotreload/"
 DLL_NAME :: "bin/app." + dynlib.LIBRARY_FILE_EXTENSION
@@ -116,7 +115,7 @@ CompareSizes :: proc(size1old, size2old, size1new, size2new: int) -> bool {
 
 main :: proc() {
   exe_path := os.args[0]
-  exe_dir := filepath.dir(string(exe_path), context.temp_allocator)
+  exe_dir := os.dir(string(exe_path))
   os.change_directory(exe_dir)
 
   version := 0

@@ -64,10 +64,12 @@ main :: proc()
     }
   }
 
-  absExePath, alloc_err := os.get_absolute_path(EXECUTABLE, context.allocator)
-  fmt.assertf(alloc_err == nil, "Could not get abs path of " + EXECUTABLE + ": %v", alloc_err)
-  isRunning := IsExecutableRunning(absExePath)
-
+  isRunning := false
+  absExePath, alloc_err := os.get_absolute_path(EXECUTABLE, context.temp_allocator)
+  if alloc_err == nil {
+    isRunning = IsExecutableRunning(absExePath)
+  }
+  
   if !os.exists(OUT_DIRECTORY) {
     os.make_directory(OUT_DIRECTORY)
   }
@@ -97,13 +99,18 @@ main :: proc()
     pdb_num_str = strconv.write_int(buf[:], i64(pdb_num), base)
     err := os.set_env(PDBS_ENV_VAR, pdb_num_str)
     fmt.assertf(err == nil, "Could not set " + PDBS_ENV_VAR + " env: %v", err)
+    pdb_name := fmt.tprintf("-pdb-name:" + PDBS_DIR + "\\app_%v.pdb", pdb_num)
+  } else {
+    err: os.Error
   }
-
-  pdb_name := fmt.tprintf("-pdb-name:" + PDBS_DIR + "\\app_%v.pdb", pdb_num)
 
   cmd: [dynamic]string
   append(&cmd, "odin", "build", "src", "-vet", "-vet-using-param", "-vet-style", 
-         "-build-mode:dll", pdb_name, "-out:" + OUT_DIRECTORY + "/app" + DLL_EXT)
+         "-build-mode:dll", "-out:" + OUT_DIRECTORY + "/app" + DLL_EXT)
+  when ODIN_OS == .Windows {
+    append(&cmd, pdb_name)
+  }
+
   if debugMode {
     append(&cmd, "-debug")
   } else {
@@ -128,8 +135,10 @@ main :: proc()
   if !isRunning {
     clear(&cmd)
     append(&cmd, "odin", "build", "src/hot-reload", "-out:" + EXECUTABLE, 
-           "-vet", "-vet-using-param", "-vet-style",
-           "-pdb-name:" + OUT_DIRECTORY + "\\main_hot_reload.pdb")
+           "-vet", "-vet-using-param", "-vet-style")
+    when ODIN_OS == .Windows {
+      append(&cmd, "-pdb-name:" + OUT_DIRECTORY + "\\main_hot_reload.pdb")
+    }
     if debugMode {
       append(&cmd, "-debug")
     } else {
