@@ -61,6 +61,7 @@ AppData :: struct {
   musicTrack: ^mix.Track,
   musicTimeLength: sdl.Sint64, /* in frames */
   musicTimePlayed: sdl.Sint64, /* in frames */
+  musicTimePlayedMs: sdl.Sint64, /* in milliseconds */
   musicSliderValue: f32,
   musicLooping: bool,
   musicLoaded: bool,

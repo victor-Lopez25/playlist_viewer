@@ -696,6 +696,7 @@ Update :: proc(app: ^AppData, input: ^Input)
 
   // song control
   app.musicTimePlayed = mix.GetTrackPlaybackPosition(app.musicTrack)
+  app.musicTimePlayedMs = mix.TrackFramesToMS(app.musicTrack, app.musicTimePlayed)
   if input.keyPressed[.RIGHT] { ForwardTime(app, 5.0) }
   else if input.keyPressed[.LEFT] { BackTime(app, 5.0) }
   if input.keyPressed[.L] { ForwardTime(app, 10.0) }
@@ -704,7 +705,7 @@ Update :: proc(app: ^AppData, input: ^Input)
   if input.keyPressed[.END] || input.keyPressed[.KP_1] {
     NextSong(app)
   } else if input.keyPressed[.HOME] || input.keyPressed[.KP_7] {
-    if app.musicTimePlayed < 12.0 {
+    if app.musicTimePlayedMs < 12000 {
       PrevSong(app)
     } else {
       if !mix.SetTrackPlaybackPosition(app.musicTrack, 0) {

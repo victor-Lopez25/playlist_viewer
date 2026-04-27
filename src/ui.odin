@@ -228,10 +228,10 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
         clay.Text(activeSong.group, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
         if app.musicLoaded {
           if clay.UI(clay.ID("MusicInfo"))({layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, padding = {16, 16, 16, 16}, childGap = 8}, backgroundColor = COLOR_ORANGE}) {
-            musicLenSecs := mix.AudioFramesToMS(app.musicAudio, sdl.Sint64(app.musicTimeLength)) / 1000
+            musicLenSecs := app.musicTimePlayedMs / 1000
             musicLenMins := musicLenSecs / 60
             musicLenSecs %= 60
-            musicPlayedSecs := mix.AudioFramesToMS(app.musicAudio, sdl.Sint64(app.musicSliderValue)) / 1000
+            musicPlayedSecs := mix.TrackFramesToMS(app.musicTrack, sdl.Sint64(app.musicSliderValue)) / 1000
             musicPlayedMins := musicPlayedSecs / 60
             musicPlayedSecs %= 60
             // NOTE: IMPORTANT: I don't like how this looks, I will for sure do another pass on the ui
