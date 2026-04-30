@@ -20,6 +20,7 @@ SongData :: struct {
   filename: string,
   source: string,
   sourceType: SongSourceType,
+  gotMetadata: bool,
 }
 
 ConfigHeader :: struct {
@@ -38,6 +39,8 @@ Playlist :: struct {
   songData: [dynamic]SongData, // NOTE: Should keep original order
   songs: [dynamic]^SongData,
   name: string,
+  playingSongIdx: int,
+  playingSongChanged: bool,
   activeSongIdx: int,
   activeSongChanged: bool,
 }
@@ -61,6 +64,7 @@ AppData :: struct {
   musicAudio: ^mix.Audio,
   musicTrack: ^mix.Track,
   musicTimeLength: sdl.Sint64, /* in frames */
+  musicTimeLengthMs: sdl.Sint64, /* in milliseconds */
   musicTimePlayed: sdl.Sint64, /* in frames */
   musicTimePlayedMs: sdl.Sint64, /* in milliseconds */
   musicSliderValue: f32,

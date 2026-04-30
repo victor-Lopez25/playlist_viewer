@@ -153,12 +153,45 @@ LoadMusicFromFile :: proc(app: ^AppData, file: cstring)
   }
 }
 
+GetAudioMetadataForSong :: proc(song: ^SongData, audio: ^mix.Audio)
+{
+  if song.gotMetadata {
+    return
+  }
+  song.gotMetadata = true
+  propId := mix.GetAudioProperties(audio)
+  if propId != 0 {
+    prop := sdl.GetStringProperty(propId, mix.PROP_METADATA_TITLE_STRING, nil)
+    if prop != nil {
+      song.name = string(prop)
+    } else {
+      song.name = song.filename
+    }
+    prop = sdl.GetStringProperty(propId, mix.PROP_METADATA_ARTIST_STRING, nil)
+    if prop != nil {
+      song.group = string(prop)
+    } else {
+      song.group = ""
+    }
+    prop = sdl.GetStringProperty(propId, mix.PROP_METADATA_ALBUM_STRING, nil)
+    if prop != nil {
+      song.album = string(prop)
+    } else {
+      song.album = ""
+    }
+  } else {
+    song.name = song.filename
+    song.group = ""
+    song.album = ""
+  }
+}
+
 ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
   playlist := &app.playlist
-  if playlist.songs[playlist.activeSongIdx].source != "" {
+  if playlist.songs[playlist.playingSongIdx].source != "" {
     if app.musicLoaded {
       app.musicLoaded = false
     }
@@ -189,34 +222,11 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
     // NOTE: Gather 'static' data from app.music here
     app.musicTimeLength = mix.GetAudioDuration(app.musicAudio)
     app.musicTimePlayed = 0.0
+    app.musicTimeLengthMs = mix.TrackFramesToMS(app.musicTrack, app.musicTimeLength)
 
     // NOTE: If not found, song name will be the name of the file with the extension removed
-    song: ^SongData = app.playlist.songs[app.playlist.activeSongIdx]
-    propId := mix.GetAudioProperties(app.musicAudio)
-    if propId != 0 {
-      prop := sdl.GetStringProperty(propId, mix.PROP_METADATA_TITLE_STRING, nil)
-      if prop != nil {
-        song.name = string(prop)
-      } else {
-        song.name = song.filename
-      }
-      prop = sdl.GetStringProperty(propId, mix.PROP_METADATA_ARTIST_STRING, nil)
-      if prop != nil {
-        song.group = string(prop)
-      } else {
-        song.group = ""
-      }
-      prop = sdl.GetStringProperty(propId, mix.PROP_METADATA_ALBUM_STRING, nil)
-      if prop != nil {
-        song.album = string(prop)
-      } else {
-        song.album = ""
-      }
-    } else {
-      song.name = song.filename
-      song.group = ""
-      song.album = ""
-    }
+    song: ^SongData = app.playlist.songs[app.playlist.playingSongIdx]
+    GetAudioMetadataForSong(song, app.musicAudio)
   }
 }
 
@@ -496,6 +506,7 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
     app.playlist.songs[i] = &app.playlist.songData[i]
   }
   app.playlist.activeSongIdx = -1
+  app.playlist.playingSongIdx = -1
   app.playlist.name = os.short_stem(listFile)
 
   if !slashpath.is_abs(listFile) {
@@ -599,14 +610,20 @@ AppDeInit :: proc(rawApp: rawptr, rawInput: rawptr)
 // Utilities
 
 NextSong :: proc(app: ^AppData) {
-  newIdx := (app.playlist.activeSongIdx + 1) % len(app.playlist.songs)
-  app.playlist.activeSongIdx = newIdx
+  newIdx := (app.playlist.playingSongIdx + 1) % len(app.playlist.songs)
+  if app.playlist.activeSongIdx == app.playlist.playingSongIdx {
+    app.playlist.activeSongIdx = newIdx
+  }
+  app.playlist.playingSongIdx = newIdx
   ChangeLoadedMusicStream(app, newIdx)
 }
 
 PrevSong :: proc(app: ^AppData) {
-  newIdx := (app.playlist.activeSongIdx - 1) %% len(app.playlist.songs)
-  app.playlist.activeSongIdx = newIdx
+  newIdx := (app.playlist.playingSongIdx - 1) %% len(app.playlist.songs)
+  if app.playlist.activeSongIdx == app.playlist.playingSongIdx {
+    app.playlist.activeSongIdx = newIdx
+  }
+  app.playlist.playingSongIdx = newIdx
   ChangeLoadedMusicStream(app, newIdx)
 }
 
@@ -786,6 +803,18 @@ Render :: proc(app: ^AppData, input: ^Input)
 
   // Generate the auto layout for rendering
   UIRenderCommands := UI_Calculate(app, input)
+  if app.playlist.activeSongChanged {
+    song: ^SongData = app.playlist.songs[app.playlist.activeSongIdx]
+    // TODO: should I keep this somewhere instead of destroying it immediately?
+    source := strings.clone_to_cstring(song.source, context.temp_allocator)
+    audio := mix.LoadAudio_IO(app.mixer, sdl.IOFromFile(source, "rb"),
+                              predecode = false, closeio = true)
+    GetAudioMetadataForSong(song, audio)
+    mix.DestroyAudio(audio)
+  }
+  if app.playlist.playingSongChanged {
+    ChangeLoadedMusicStream(app, app.playlist.playingSongIdx)
+  }
 
   sdl.SetRenderDrawColor(app.renderer, 0, 0, 0, 255)
   sdl.RenderClear(app.renderer)
@@ -807,20 +836,9 @@ MainLoop :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   free_all(context.temp_allocator)
 
   shouldQuit := GetInput(app, input)
-  if false { // ray.IsWindowMinimized() {
-    // TODO: Also decrease fps?
-    //ray.UpdateMusicStream(app.music)
-    if !app.musicPause && app.musicLoaded && false { // !ray.IsMusicStreamPlaying(app.music) {
-      newIdx := (app.playlist.activeSongIdx + 1) % len(app.playlist.songs)
-      app.playlist.activeSongIdx = newIdx
-      ChangeLoadedMusicStream(app, newIdx)
-    }
-    //ray.BeginDrawing(); ray.EndDrawing() // end frame
-  }
-  else {
-    Update(app, input)
-    Render(app, input)
-  }
+  // TODO: Low power stuff, don't render if minimized, decrease fps...?
+  Update(app, input)
+  Render(app, input)
 
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer)
 

@@ -78,20 +78,7 @@ UI_Prepare :: proc(app: ^AppData, input: ^Input)
   }
 
   playlist.activeSongChanged = false
-  if input.mouseLeftDown {
-    iniActive := playlist.activeSongIdx
-    for songIdx := 0; songIdx < len(playlist.songs); songIdx += 1
-    {
-      if clay.PointerOver(clay.ID(playlist.songs[songIdx].name, u32(songIdx))) {
-        playlist.activeSongIdx = songIdx
-      }
-    }
-    if iniActive != playlist.activeSongIdx { playlist.activeSongChanged = true }
-  }
-  if playlist.activeSongChanged {
-    //fmt.println("active song:", playlist.activeSong^)
-    ChangeLoadedMusicStream(app, playlist.activeSongIdx)
-  }
+  playlist.playingSongChanged = false
 
   SCROLL_INTENSITY :: 2
   clay.UpdateScrollContainers(true, clay.Vector2{input.mouseWheel.x, input.mouseWheel.y*SCROLL_INTENSITY}, input.deltaTime)
@@ -206,15 +193,38 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
       {
         for songIdx := 0; songIdx < len(playlist.songs); songIdx += 1
         {
-          //if songIdx == 250 { break }
           song := playlist.songs[songIdx]
+          
+          clay._OpenElementWithId(clay.ID(playlist.songs[songIdx].name, u32(songIdx)))
 
-          colorMultiplier := [4]f32{0.8,0.8,0.8,1.0} if app.playlist.activeSongIdx == songIdx else [4]f32{1.0,1.0,1.0,1.0}
-          if clay.UI(clay.ID(playlist.songs[songIdx].name, u32(songIdx)))({layout = {sizing = {clay.SizingGrow({}), clay.SizingGrow({})}, padding = {16,16,16,16}},
-            backgroundColor = (clay.Hovered() ? (input.mouseLeftDown ? {176, 90, 34, 255} : {200, 110, 40, 255}) : COLOR_ORANGE)*colorMultiplier}) {
-
-            clay.Text(song.filename, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
+          colorMultiplier: f32 = 0.8 if app.playlist.playingSongIdx == songIdx else 1.0
+          color := clay.Color{colorMultiplier,colorMultiplier,colorMultiplier,1.0}
+          if clay.Hovered() {
+            if input.mouseLeftDown {
+              color = {176, 90, 34, 255} * color
+              if playlist.playingSongIdx != songIdx {
+                playlist.playingSongChanged = true
+              }
+              if playlist.activeSongIdx != songIdx {
+                playlist.activeSongChanged = true
+              }
+              playlist.playingSongIdx = songIdx
+              playlist.activeSongIdx = songIdx
+            } else {
+              color = {200, 110, 40, 255} * color
+            }
+          } else {
+            color = COLOR_ORANGE * color
           }
+
+          clay.ConfigureOpenElement({
+            layout = {sizing = sizingGrow00, padding = {16,16,16,16}},
+            backgroundColor = color,
+          })
+
+          clay.Text(song.filename, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
+
+          clay._CloseElement()
         }
       }
     }
@@ -226,7 +236,7 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
         clay.Text(activeSong.group, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
         if app.musicLoaded {
           if clay.UI(clay.ID("MusicInfo"))({layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, padding = {16, 16, 16, 16}, childGap = 8}, backgroundColor = COLOR_ORANGE}) {
-            musicLenSecs := app.musicTimePlayedMs / 1000
+            musicLenSecs := app.musicTimeLengthMs / 1000
             musicLenMins := musicLenSecs / 60
             musicLenSecs %= 60
             musicPlayedSecs := mix.TrackFramesToMS(app.musicTrack, sdl.Sint64(app.musicSliderValue)) / 1000
@@ -235,7 +245,6 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
             // NOTE: IMPORTANT: I don't like how this looks, I will for sure do another pass on the ui
             musicText := fmt.tprintf("%2d:%2d/%2d:%2d", musicPlayedMins, musicPlayedSecs, musicLenMins, musicLenSecs)
             clay.Text(musicText, clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
-
 
             if clay.UI()({layout = {sizing = {sizingGrow0, clay.SizingFit({})}, padding = {4, 4, 0, 0}}}) {
               SongSlider(app, input, clay.ID("SongProgressSlider"))

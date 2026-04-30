@@ -1,6 +1,6 @@
 [/] Better error messages
-[ ] Improve parser to show errors
-[ ] Different thing for active song and playing song, so I can check out info on a song that
+[x] Improve parser to show errors
+[x] Different thing for active song and playing song, so I can check out info on a song that
     I'm not playing and if I go back to the playing song it doesn't start over
 [ ] Automatic scroll down when getting to a song that is offscreen (maybe two before ?)
 [x] Store the songs as []^SongData pointing to a []SongData array
