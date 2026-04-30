@@ -10,6 +10,7 @@ import "core:sync"
 import "core:slice"
 import "core:strings"
 import "core:math/rand"
+import "core:mem/virtual"
 import "core:path/slashpath"
 
 import spall "spall-wrapper"
@@ -153,7 +154,7 @@ LoadMusicFromFile :: proc(app: ^AppData, file: cstring)
   }
 }
 
-GetAudioMetadataForSong :: proc(song: ^SongData, audio: ^mix.Audio)
+GetAudioMetadataForSong :: proc(song: ^SongData, audio: ^mix.Audio, allocator: mem.Allocator)
 {
   if song.gotMetadata {
     return
@@ -163,19 +164,19 @@ GetAudioMetadataForSong :: proc(song: ^SongData, audio: ^mix.Audio)
   if propId != 0 {
     prop := sdl.GetStringProperty(propId, mix.PROP_METADATA_TITLE_STRING, nil)
     if prop != nil {
-      song.name = string(prop)
+      song.name = strings.clone_from_cstring(prop, allocator)
     } else {
       song.name = song.filename
     }
     prop = sdl.GetStringProperty(propId, mix.PROP_METADATA_ARTIST_STRING, nil)
     if prop != nil {
-      song.group = string(prop)
+      song.group = strings.clone_from_cstring(prop, allocator)
     } else {
       song.group = ""
     }
     prop = sdl.GetStringProperty(propId, mix.PROP_METADATA_ALBUM_STRING, nil)
     if prop != nil {
-      song.album = string(prop)
+      song.album = strings.clone_from_cstring(prop, allocator)
     } else {
       song.album = ""
     }
@@ -226,7 +227,7 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
 
     // NOTE: If not found, song name will be the name of the file with the extension removed
     song: ^SongData = app.playlist.songs[app.playlist.playingSongIdx]
-    GetAudioMetadataForSong(song, app.musicAudio)
+    GetAudioMetadataForSong(song, app.musicAudio, app.arena_allocator)
   }
 }
 
@@ -462,16 +463,23 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   ok: bool
   app.spall_ctx, ok = spall.context_create("trace.spall")
   if !ok {
-    sdl.Log("Could not create Spall context")
+    fmt.eprintln("Could not create Spall context")
     return false
   }
   app.spall_backing_buffer = make([]u8, spall.BUFFER_DEFAULT_SIZE)
   if app.spall_backing_buffer == nil {
-    sdl.Log("Could not allocate spall backing buffer")
+    fmt.eprintln("Could not allocate spall backing buffer")
     return false
   }
   app.spall_buffer = spall.buffer_create(app.spall_backing_buffer, u32(sync.current_thread_id()))
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
+
+  alloc_err := virtual.arena_init_growing(&app.arena)
+  if alloc_err != nil {
+    fmt.eprintfln("Could not init growing arena: %v", alloc_err)
+    return false
+  }
+  app.arena_allocator = virtual.arena_allocator(&app.arena)
 
   err: os.Error
   data: []u8
@@ -602,6 +610,7 @@ AppDeInit :: proc(rawApp: rawptr, rawInput: rawptr)
   delete(app.playlist.songData)
   free(app)
   free(input)
+  virtual.arena_destroy(&app.arena)
 }
 
 @export MemorySize :: proc() -> (int, int) { return size_of(AppData), size_of(Input) }
@@ -809,7 +818,7 @@ Render :: proc(app: ^AppData, input: ^Input)
     source := strings.clone_to_cstring(song.source, context.temp_allocator)
     audio := mix.LoadAudio_IO(app.mixer, sdl.IOFromFile(source, "rb"),
                               predecode = false, closeio = true)
-    GetAudioMetadataForSong(song, audio)
+    GetAudioMetadataForSong(song, audio, app.arena_allocator)
     mix.DestroyAudio(audio)
   }
   if app.playlist.playingSongChanged {

@@ -1,6 +1,8 @@
 package main
 
 import "base:runtime"
+import "core:mem"
+import "core:mem/virtual"
 import spall "spall-wrapper"
 import clay "clay-odin"
 import sdl "vendor:sdl3"
@@ -48,6 +50,8 @@ Playlist :: struct {
 AppData :: struct {
   spall_ctx: spall.Context,
   spall_buffer: spall.Buffer, // NOTE: This must be one per thread
+  arena: virtual.Arena,
+  arena_allocator: mem.Allocator,
 
   window: ^sdl.Window,
   renderer: ^sdl.Renderer,
