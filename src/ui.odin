@@ -204,20 +204,18 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
       if clay.UI(clay.ID("SongList"))({layout = { layoutDirection = .TopToBottom, padding = {16, 24, 0, 0}, childGap = 6, sizing = {width = sizingGrow0, height = sizingGrow0 }}, //clay.SizingFit({})}},
         clip = {vertical = true, childOffset = clay.GetScrollOffset()}})
       {
-//        for i:=0;i<5;i+=1 {
-          for songIdx := 0; songIdx < len(playlist.songs); songIdx += 1
-          {
-            //if songIdx == 250 { break }
-            song := playlist.songs[songIdx]
+        for songIdx := 0; songIdx < len(playlist.songs); songIdx += 1
+        {
+          //if songIdx == 250 { break }
+          song := playlist.songs[songIdx]
 
-            colorMultiplier := [4]f32{0.8,0.8,0.8,1.0} if app.playlist.activeSongIdx == songIdx else [4]f32{1.0,1.0,1.0,1.0}
-            if clay.UI(clay.ID(playlist.songs[songIdx].name, u32(songIdx)))({layout = {sizing = {clay.SizingGrow({}), clay.SizingGrow({})}, padding = {16,16,16,16}},
-              backgroundColor = (clay.Hovered() ? (input.mouseLeftDown ? {176, 90, 34, 255} : {200, 110, 40, 255}) : COLOR_ORANGE)*colorMultiplier}) {
+          colorMultiplier := [4]f32{0.8,0.8,0.8,1.0} if app.playlist.activeSongIdx == songIdx else [4]f32{1.0,1.0,1.0,1.0}
+          if clay.UI(clay.ID(playlist.songs[songIdx].name, u32(songIdx)))({layout = {sizing = {clay.SizingGrow({}), clay.SizingGrow({})}, padding = {16,16,16,16}},
+            backgroundColor = (clay.Hovered() ? (input.mouseLeftDown ? {176, 90, 34, 255} : {200, 110, 40, 255}) : COLOR_ORANGE)*colorMultiplier}) {
 
-              clay.Text(song.name, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
-            }
+            clay.Text(song.filename, clay.TextElementConfig({fontSize = 16, textColor = {0, 0, 0, 255}}))
           }
-  //      }
+        }
       }
     }
 

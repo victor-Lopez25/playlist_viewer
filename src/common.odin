@@ -17,6 +17,7 @@ SongSourceType :: enum {
 
 SongData :: struct {
   group, name, album: string,
+  filename: string,
   source: string,
   sourceType: SongSourceType,
 }

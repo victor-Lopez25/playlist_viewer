@@ -122,7 +122,7 @@ ParseSongs :: proc(app: ^AppData, data: []u8)
       // NOTE: group and album should be figured out from metadata, probably
       group = "",
       album = "",
-      name = os.short_stem(line),
+      filename = os.short_stem(line),
       source = line,
       sourceType = .File,
     }
@@ -189,6 +189,34 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
     // NOTE: Gather 'static' data from app.music here
     app.musicTimeLength = mix.GetAudioDuration(app.musicAudio)
     app.musicTimePlayed = 0.0
+
+    // NOTE: If not found, song name will be the name of the file with the extension removed
+    song: ^SongData = app.playlist.songs[app.playlist.activeSongIdx]
+    propId := mix.GetAudioProperties(app.musicAudio)
+    if propId != 0 {
+      prop := sdl.GetStringProperty(propId, mix.PROP_METADATA_TITLE_STRING, nil)
+      if prop != nil {
+        song.name = string(prop)
+      } else {
+        song.name = song.filename
+      }
+      prop = sdl.GetStringProperty(propId, mix.PROP_METADATA_ARTIST_STRING, nil)
+      if prop != nil {
+        song.group = string(prop)
+      } else {
+        song.group = ""
+      }
+      prop = sdl.GetStringProperty(propId, mix.PROP_METADATA_ALBUM_STRING, nil)
+      if prop != nil {
+        song.album = string(prop)
+      } else {
+        song.album = ""
+      }
+    } else {
+      song.name = song.filename
+      song.group = ""
+      song.album = ""
+    }
   }
 }
 
