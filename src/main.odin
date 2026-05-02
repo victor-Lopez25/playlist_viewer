@@ -120,7 +120,8 @@ ParseSongs :: proc(app: ^AppData, data: []u8)
     }
 
     song := SongData {
-      // NOTE: group and album should be figured out from metadata, probably
+      // NOTE: Metadata will be read when the song gets loaded
+      name = "",
       group = "",
       album = "",
       filename = os.short_stem(line),
@@ -239,25 +240,28 @@ AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
   ok := sdl.GetPathInfo(listFile, &pathinfo)
   if !ok do return false
 
-  ReadDirectoryData :: struct { ctx: runtime.Context, songData: ^[dynamic]SongData }
+  ReadDirectoryData :: struct {
+    ctx: runtime.Context,
+    songData: ^[dynamic]SongData,
+    allocator: ^mem.Allocator,
+  }
   ReadDirectoryFile :: proc "c"(rawdata: rawptr, dirname, fname: cstring) -> sdl.EnumerationResult
   {
     data := cast(^ReadDirectoryData)rawdata
     context = data.ctx
 
     name := string(fname)
-    fullpath := slashpath.join({string(dirname), name})
-    ext := slashpath.ext(name)
-    info: sdl.PathInfo
-    ok := sdl.GetPathInfo(strings.clone_to_cstring(fullpath, context.temp_allocator), &info)
-    if !ok do return .CONTINUE
+    fullpath := slashpath.join({string(dirname), name}, data.allocator^)
+    ext := os.ext(name)
+    isfile := os.is_file(fullpath)
 
-    if len(ext) > 1 { ext = ext[1:] }
-    if info.type != .DIRECTORY && CheckMusicFileExt(ext, include_dot = false) {
+    if isfile && CheckMusicFileExt(ext, include_dot = true) {
       song := SongData{
+        // NOTE: Metadata will be read when the song gets loaded
         group = "",
-        name = strings.clone(os.short_stem(name)),
+        name = "",
         album = "",
+        filename = os.short_stem(fullpath),
         source = fullpath,
         sourceType = .File,
       }
@@ -268,7 +272,11 @@ AddSongsToList :: proc(app: ^AppData, listFile: cstring) -> bool
   }
 
   if pathinfo.type == .DIRECTORY {
-    data := ReadDirectoryData{ ctx = context, songData = &app.playlist.songData }
+    data := ReadDirectoryData{
+      ctx = context,
+      songData = &app.playlist.songData,
+      allocator = &app.arena_allocator,
+    }
     ok = sdl.EnumerateDirectory(listFile, ReadDirectoryFile, &data)
   } else {
     size: uint
