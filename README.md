@@ -8,6 +8,8 @@ The reason why I started making this is so I can actually store a list of songs 
 
 For planned updates/fixes, see TODO.txt
 
+For prebuilt binaries (windows only for now), see [releases](https://github.com/victor-Lopez25/playlist_viewer/releases/latest)
+
 ## Usage
 
 ```console
