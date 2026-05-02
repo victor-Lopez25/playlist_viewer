@@ -232,6 +232,9 @@ main :: proc()
       when ODIN_OS == .Windows {
         os_err: os.Error
 
+        os_err = os.remove("playlist_viewer.zip")
+        fmt.assertf(os_err == nil, "Could not remove playlist_viewer.zip: %v", os_err)
+
         clear(&cmd)
         append(&cmd, "7z", "a", "-tzip", "-r", "playlist_viewer.zip", 
                "build.odin", "pv.exe", "SDL3*.dll", "TODO.txt", "README.md", "LICENSE", "lists/NCS.list",

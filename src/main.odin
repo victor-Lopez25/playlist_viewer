@@ -145,6 +145,7 @@ LoadMusicFromFile :: proc(app: ^AppData, file: cstring)
     } else {
       if mix.PlayTrack(app.musicTrack, 0) {
         app.musicLoaded = true
+        app.musicPause = false
         if prevAudio != nil {
           mix.DestroyAudio(prevAudio)
         }
@@ -206,8 +207,8 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
       }
       case .File: {
         if os.exists(activeSong.source) {
-            filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
-            LoadMusicFromFile(app, filename)
+          filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
+          LoadMusicFromFile(app, filename)
         } else {
           b: strings.Builder = strings.builder_make_len_cap(0, 40, context.temp_allocator)
           filepath := fmt.sbprintf(&b, "../songs/%s", activeSong.source)
