@@ -45,6 +45,7 @@ main :: proc()
   shouldClean := false
   debugMode := true
   shouldRun := false
+  prepareRelease := false
   for arg in os.args[1:] {
     switch arg {
       case "clean":   shouldClean = true
@@ -52,6 +53,11 @@ main :: proc()
       case "release": debugMode = false
       case "run":     shouldRun = true
       case "norun":   shouldRun = false
+      case "prepare-release": {
+        debugMode = false
+        shouldRun = false
+        prepareRelease = true
+      }
     }
   }
 
@@ -94,7 +100,11 @@ main :: proc()
 
     pdb_num_str := os.get_env(buf[:], PDBS_ENV_VAR)
     pdb_num, ok = strconv.parse_int(pdb_num_str, base)
-    fmt.assertf(ok, "Could not parse int from " + PDBS_ENV_VAR + " env")
+    if !ok {
+      // If this failed it's because the terminal was closed
+      pdb_num = 0
+      fmt.eprintfln("Failed to parse int from " + PDBS_ENV_VAR + ". Defaulting to 1")
+    }
     pdb_num += 1
     pdb_num_str = strconv.write_int(buf[:], i64(pdb_num), base)
     err := os.set_env(PDBS_ENV_VAR, pdb_num_str)
@@ -217,6 +227,25 @@ main :: proc()
       fmt.println(string(stderr))
       if state.exit_code != 0 {
         fmt.eprintfln("Error while executing " + EXECUTABLE + " status: %v", state.exit_code)
+      }
+    } else if prepareRelease {
+      when ODIN_OS == .Windows {
+        os_err: os.Error
+
+        clear(&cmd)
+        append(&cmd, "7z", "a", "-tzip", "-r", "playlist_viewer.zip", 
+               "build.odin", "pv.exe", "SDL3*.dll", "TODO.txt", "README.md", "LICENSE", "lists/NCS.list",
+               "src", "bin", "resources", "songs/*NCS*")
+        desc.command = cmd[:]
+        state, stdout, stderr, os_err = os.process_exec(desc, context.temp_allocator)
+        fmt.assertf(err == nil, "Could not execute process %v: %v", desc.command, err)
+        fmt.println(string(stdout))
+        fmt.println(string(stderr))
+        if state.exit_code != 0 {
+          fmt.eprintfln("Error while preparing for release. status: %v", state.exit_code)
+        }
+      } else {
+        // TODO: Release binaries for other oses?
       }
     }
   }
