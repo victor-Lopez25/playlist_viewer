@@ -213,6 +213,17 @@ main :: proc()
           fmt.eprintfln("Please copy SDL3_mixer" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/ttf/SDL3_mixer" + DLL_EXT + " to the same directory as " + EXECUTABLE)
         }
       }
+
+      if !os.exists("SDL3_image" + DLL_EXT) {
+        sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/image/SDL3_image" + DLL_EXT, paths[0])
+        if os.exists(sdl_dll_path) {
+          fmt.eprintfln("SDL3_image" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
+          os_err := os.copy_file(".", sdl_dll_path)
+          fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
+        } else {
+          fmt.eprintfln("Please copy SDL3_image" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/image/SDL3_image" + DLL_EXT + " to the same directory as " + EXECUTABLE)
+        }
+      }
     }
     
     if shouldRun {

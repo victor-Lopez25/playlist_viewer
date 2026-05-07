@@ -376,13 +376,13 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input) -> bool
     return false
   }
 
-  font := ttf.OpenFont("resources/Inconsolata-Regular.ttf", 16);
+  font := ttf.OpenFont("resources/fonts/Inconsolata-Regular.ttf", 16);
   if font == nil {
     sdl.Log("Could not load font: %s", sdl.GetError())
     return false
   }
   app.clay_renderData.fonts[Font_Inconsolata] = font
-  font = ttf.OpenFont("resources/liberation-mono.ttf", 16);
+  font = ttf.OpenFont("resources/fonts/liberation-mono.ttf", 16);
   if font == nil {
     sdl.Log("Could not load font: %s", sdl.GetError())
     return false
@@ -650,7 +650,13 @@ ForwardTime :: #force_inline proc(app: ^AppData, seconds: f32)
   // TODO: Use TrackMSToFrames or AudioMSToFrames?
   app.musicTimePlayed = min(app.musicTimePlayed + mix.TrackMSToFrames(app.musicTrack, i64(seconds*1000.0)), app.musicTimeLength)
   if app.musicTimePlayed == app.musicTimeLength {
-    NextSong(app)
+    if app.musicLooping {
+      if !mix.SetTrackPlaybackPosition(app.musicTrack, 0) {
+        sdl.Log("Could not set track playback position: %s", sdl.GetError())
+      }
+    } else {
+      NextSong(app)
+    }
   } else {
     if !mix.SetTrackPlaybackPosition(app.musicTrack, app.musicTimePlayed) {
       sdl.Log("Could not set track playback position: %s", sdl.GetError())
@@ -744,13 +750,12 @@ Update :: proc(app: ^AppData, input: ^Input)
   }
 
   // volume
-  if input.keyDown[.UP] {
+  if input.keyDown[.UP] || input.keyDown[.KP_8] {
     app.volume = min(app.volume + 0.005, 1.0)
     if !mix.SetMixerGain(app.mixer, app.volume) {
       sdl.Log("Could not set volume: %s", sdl.GetError())
     }
-  }
-  if input.keyDown[.DOWN] {
+  } else if input.keyDown[.DOWN] || input.keyDown[.KP_2] {
     app.volume = max(app.volume - 0.005, 0.0)
     if !mix.SetMixerGain(app.mixer, app.volume) {
       sdl.Log("Could not set volume: %s", sdl.GetError())
@@ -760,8 +765,12 @@ Update :: proc(app: ^AppData, input: ^Input)
   // song control
   app.musicTimePlayed = mix.GetTrackPlaybackPosition(app.musicTrack)
   app.musicTimePlayedMs = mix.TrackFramesToMS(app.musicTrack, app.musicTimePlayed)
-  if input.keyPressed[.RIGHT] { ForwardTime(app, 5.0) }
-  else if input.keyPressed[.LEFT] { BackTime(app, 5.0) }
+  if input.keyPressed[.RIGHT] || input.keyPressed[.KP_6] {
+    ForwardTime(app, 5.0)
+  } else if input.keyPressed[.LEFT] || input.keyPressed[.KP_4] {
+    BackTime(app, 5.0)
+  }
+
   if input.keyPressed[.L] { ForwardTime(app, 10.0) }
   else if input.keyPressed[.J] { BackTime(app, 10.0) }
 
@@ -795,6 +804,9 @@ Update :: proc(app: ^AppData, input: ^Input)
     rand.shuffle(app.playlist.songs[:])
     if app.playlist.activeSongIdx != -1 {
       app.playlist.activeSongIdx = 0
+    }
+    if app.playlist.playingSongIdx != -1 {
+      app.playlist.playingSongIdx = 0
       ChangeLoadedMusicStream(app, 0)
     }
   }
