@@ -75,7 +75,7 @@ main :: proc()
   if alloc_err == nil {
     isRunning = IsExecutableRunning(absExePath)
   }
-  
+
   if !os.exists(OUT_DIRECTORY) {
     os.make_directory(OUT_DIRECTORY)
   }
@@ -133,6 +133,7 @@ main :: proc()
   state: os.Process_State
   stdout, stderr: []u8
 
+  fmt.printfln("CMD: %v", desc.command)
   state, stdout, stderr, err = os.process_exec(desc, context.temp_allocator)
   fmt.assertf(err == nil, "Could not execute process %v: %v", desc.command, err)
   fmt.printf(string(stdout))
@@ -155,6 +156,7 @@ main :: proc()
       append(&cmd, ..RELEASE_FLAGS)
     }
     desc.command = cmd[:]
+    fmt.printfln("CMD: %v", desc.command)
     state, stdout, stderr, err = os.process_exec(desc, context.temp_allocator)
     fmt.assertf(err == nil, "Could not execute process %v: %v", desc.command, err)
     fmt.printf(string(stdout))
@@ -167,6 +169,7 @@ main :: proc()
     clear(&cmd)
     append(&cmd, "odin", "root")
     desc.command = cmd[:]
+    fmt.printfln("CMD: %v", desc.command)
     state, stdout, stderr, err = os.process_exec(desc, context.temp_allocator)
     fmt.assertf(err == nil, "Could not execute process %v: %v", desc.command, err)
     if state.exit_code != 0 {
@@ -182,10 +185,10 @@ main :: proc()
       // NOTE: SDL3, SDL3_ttf and SDL3_mixer only have bindings on linux, it is not prebuilt, so we depend on system libraries
       sdl_dll_name := "SDL3.dll" if ODIN_OS == .Windows else "libSDL3.so"
       if !os.exists("SDL3" + DLL_EXT) {
-        sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/SDL3" + DLL_EXT, paths[0])
+        sdl_dll_path := fmt.tprintf("%svendor/sdl3/SDL3" + DLL_EXT, paths[0])
         if os.exists(sdl_dll_path) {
           fmt.eprintfln("SDL3" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
-          os_err := os.copy_file(".", sdl_dll_path)
+          os_err := os.copy_file("./SDL3.dll", sdl_dll_path)
           fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
         } else {
           fmt.eprintfln("Please copy SDL3" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/SDL3" + DLL_EXT + " to the same directory as " + EXECUTABLE)
@@ -193,10 +196,10 @@ main :: proc()
       }
       
       if !os.exists("SDL3_ttf" + DLL_EXT) {
-        sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/ttf/SDL3_ttf" + DLL_EXT, paths[0])
+        sdl_dll_path := fmt.tprintf("%svendor/sdl3/ttf/SDL3_ttf" + DLL_EXT, paths[0])
         if os.exists(sdl_dll_path) {
           fmt.eprintfln("SDL3_ttf" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
-          os_err := os.copy_file(".", sdl_dll_path)
+          os_err := os.copy_file("./SDL3_ttf.dll", sdl_dll_path)
           fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
         } else {
           fmt.eprintfln("Please copy SDL3_ttf" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/ttf/SDL3_ttf" + DLL_EXT + " to the same directory as " + EXECUTABLE)
@@ -204,21 +207,21 @@ main :: proc()
       }
     
       if !os.exists("SDL3_mixer" + DLL_EXT) {
-        sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/ttf/SDL3_mixer" + DLL_EXT, paths[0])
+        sdl_dll_path := fmt.tprintf("%svendor/sdl3/mixer/SDL3_mixer" + DLL_EXT, paths[0])
         if os.exists(sdl_dll_path) {
           fmt.eprintfln("SDL3_mixer" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
-          os_err := os.copy_file(".", sdl_dll_path)
+          os_err := os.copy_file("./SDL3_mixer.dll", sdl_dll_path)
           fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
         } else {
-          fmt.eprintfln("Please copy SDL3_mixer" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/ttf/SDL3_mixer" + DLL_EXT + " to the same directory as " + EXECUTABLE)
+          fmt.eprintfln("Please copy SDL3_mixer" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/mixer/SDL3_mixer" + DLL_EXT + " to the same directory as " + EXECUTABLE)
         }
       }
 
       if !os.exists("SDL3_image" + DLL_EXT) {
-        sdl_dll_path := fmt.tprintf("%s/vendor/sdl3/image/SDL3_image" + DLL_EXT, paths[0])
+        sdl_dll_path := fmt.tprintf("%svendor/sdl3/image/SDL3_image" + DLL_EXT, paths[0])
         if os.exists(sdl_dll_path) {
           fmt.eprintfln("SDL3_image" + DLL_EXT + " not found in current directory. Copying from %s", sdl_dll_path)
-          os_err := os.copy_file(".", sdl_dll_path)
+          os_err := os.copy_file("./SDL3_image.dll", sdl_dll_path)
           fmt.assertf(os_err == nil, "Could not copy file: %v", os_err)
         } else {
           fmt.eprintfln("Please copy SDL3_image" + DLL_EXT + " from <your_odin_compiler>/vendor/sdl3/image/SDL3_image" + DLL_EXT + " to the same directory as " + EXECUTABLE)
@@ -232,6 +235,7 @@ main :: proc()
       clear(&cmd)
       append(&cmd, EXECUTABLE)
       desc.command = cmd[:]
+      fmt.printfln("CMD: %v", desc.command)
       state, stdout, stderr, os_err = os.process_exec(desc, context.temp_allocator)
       fmt.assertf(err == nil, "Could not execute process %v: %v", desc.command, err)
       fmt.println(string(stdout))
@@ -251,6 +255,7 @@ main :: proc()
                "build.odin", "pv.exe", "SDL3*.dll", "TODO.txt", "README.md", "LICENSE", "lists/NCS.list",
                "src", "bin", "resources", "songs/*NCS*")
         desc.command = cmd[:]
+        fmt.printfln("CMD: %v", desc.command)
         state, stdout, stderr, os_err = os.process_exec(desc, context.temp_allocator)
         fmt.assertf(err == nil, "Could not execute process %v: %v", desc.command, err)
         fmt.println(string(stdout))

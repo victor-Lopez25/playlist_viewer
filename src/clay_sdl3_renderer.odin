@@ -181,6 +181,12 @@ SDL_Clay_RenderArc :: proc(rendererData: ^Clay_SDL3RendererData, center: sdl.FPo
 
 currentClippingRectangle: sdl.Rect
 
+Clay_ImageRenderData :: struct {
+  texture: ^sdl.Texture,
+  spritesheet: ^SpritesheetData,
+  imgIdx: i32,
+}
+
 SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: ^clay.ClayArray(clay.RenderCommand))
 {
   for i: i32 = 0; i < rcommands.length; i += 1 {
@@ -270,9 +276,15 @@ SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: 
       } break;
       
       case .Image: {
-        texture := cast(^sdl.Texture)rcmd.renderData.image.imageData
+        img := cast(^Clay_ImageRenderData)rcmd.renderData.image.imageData
         dest := sdl.FRect{ rect.x, rect.y, rect.w, rect.h }
-        sdl.RenderTexture(rendererData.renderer, texture, nil, &dest)
+        if img.texture != nil {
+          sdl.RenderTexture(rendererData.renderer, img.texture, nil, &dest)
+        } else if img.spritesheet != nil {
+          imgRect := img.spritesheet.aseprite.frames[img.imgIdx].frame
+          src := sdl.FRect{ f32(imgRect.x), f32(imgRect.y), f32(imgRect.w), f32(imgRect.h) }
+          sdl.RenderTexture(rendererData.renderer, img.spritesheet.tex, &src, &dest)
+        }
       } break;
 
       case .ScissorStart: {

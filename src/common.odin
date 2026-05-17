@@ -1,6 +1,5 @@
 package main
 
-import "base:runtime"
 import "core:mem"
 import "core:mem/virtual"
 import spall "spall-wrapper"
@@ -10,6 +9,13 @@ import mix "vendor:sdl3/mixer"
 
 TARGET_FPS :: 60.0
 TARGET_NS :: 1000000000.0 / TARGET_FPS
+
+UI_Button :: enum {
+  PLAY = 0,
+  RANDOMIZE = 1,
+  LOOP_CURRENT = 2,
+  PAUSE = 3,
+}
 
 SongSourceType :: enum {
   None, /* no song source */
@@ -58,6 +64,9 @@ AppData :: struct {
   windowWidth, windowHeight: i32,
   clay_renderData: Clay_SDL3RendererData,
 
+  iconSpritesheet: SpritesheetData,
+  imageData: List(Clay_ImageRenderData),
+
   defaultConfig: ConfigFileInfo,
   volume: f32,
   playlist: Playlist,
@@ -80,7 +89,7 @@ AppData :: struct {
 
   playlistFileAbsPath: cstring,
 
-  eventFilterData: struct { app: ^AppData, input: ^Input, Context: runtime.Context },
+  eventFilterData: EventFilterData,
 }
 
 Input :: struct {
@@ -97,4 +106,106 @@ Input :: struct {
 
   keyDown: #sparse[sdl.Scancode]bool,
   keyPressed: #sparse[sdl.Scancode]bool,
+}
+
+// linked list with free list
+ListNode :: struct($Type: typeid) {
+  next: ^ListNode(Type),
+  data: Type,
+}
+
+List :: struct($Type: typeid) {
+  head: ^ListNode(Type),
+  tail: ^ListNode(Type),
+  free: ^ListNode(Type),
+}
+
+List_Append :: proc(l: ^List($ListType), data: ListType, allocator: mem.Allocator) -> ^ListType
+{
+  node: ^ListNode(ListType)
+  if l.free != nil {
+    node = l.free
+    l.free = l.free.next
+  } else {
+    node = new(ListNode(ListType), allocator)
+  }
+  node.data = data
+  if l.tail != nil {
+    l.tail.next = node
+  } else {
+    l.head = node
+  }
+  l.tail = node
+  
+  return &node.data
+}
+
+// Append to the start
+List_Prepend :: proc(l: ^List($ListType), data: ListType, allocator: mem.Allocator) -> ^ListType
+{
+  node: ^ListNode(ListType)
+  if l.free != nil {
+    node = l.free
+    l.free = l.free.next
+  } else {
+    node = new(ListNode(ListType), allocator)
+  }
+  node.next = l.head
+  node.data = data
+  if l.head == nil {
+    l.tail = node
+  }
+  l.head = node
+
+  return &node.data
+}
+
+List_FreeNode :: proc "contextless"(l: ^List($ListType), node: ^ListNode(ListType))
+{
+  prev: ^ListNode(ListType)
+  found := false
+  for n := l.head; n != nil; n = n.next {
+    if n == node {
+      found = true
+      break
+    }
+    prev = n
+  }
+
+  if found {
+    if prev != nil {
+      prev.next = node.next
+    } else {
+      l.head = node.next
+    }
+    node.next = l.free
+    l.free = node
+  }
+}
+
+List_FreeAll :: proc "contextless"(l: ^List($ListType))
+{
+  if l.tail != nil {
+    l.tail.next = l.free
+    l.free = l.head
+    l.head = nil
+    l.tail = nil
+  }
+}
+
+// NOTE: I won't use this since I'll be keeping the nodes in an arena
+List_FreeAllMem :: proc(l: ^List($ListType), allocator: mem.Allocator)
+{
+  next: ^ListNode($ListType)
+  for node := l.head; node != nil; node = next {
+    next = node.next
+    free(node, allocator)
+  }
+  for node := l.free; node != nil; node = next {
+    next = node.next
+    free(node, allocator)
+  }
+  l.head = nil
+  l.free = nil
+  l.tail = nil
 }

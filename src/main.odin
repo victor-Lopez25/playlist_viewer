@@ -543,6 +543,25 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
     sdl.Log("Could not set volume: %s", sdl.GetError())
   }
 
+  if !LoadAsepriteSpritesheetData(&app.iconSpritesheet, "resources/pixel/music-player-pixel-icons.json", app.arena_allocator) {
+    fmt.eprintfln("Could not load aseprite spritesheet data")
+    return false
+  }
+
+  {
+    //primary := sdl.Color{10, 250, 180, 255}
+    //secondary := sdl.Color{10, 220, 250, 255}
+    //terniary := sdl.Color{80, 10, 250, 255}
+
+    primary := sdl.Color{255, 0, 0, 255}
+    secondary := sdl.Color{0, 0, 255, 255}
+    terniary := sdl.Color{0, 255, 0, 255}
+    if !MapSpritesheetColors(app.renderer, &app.iconSpritesheet, primary, secondary, terniary) {
+      fmt.eprintfln("Could not map spritesheet colors")
+      return false
+    }
+  }
+
   when ODIN_DEBUG {
     // have seed always be the same number for debug
     rand.reset(0)
@@ -634,6 +653,10 @@ NextSong :: proc(app: ^AppData) {
   }
   app.playlist.playingSongIdx = newIdx
   ChangeLoadedMusicStream(app, newIdx)
+
+  if app.musicLooping {
+    HandleMusicLooping(app)
+  }
 }
 
 PrevSong :: proc(app: ^AppData) {
@@ -643,6 +666,10 @@ PrevSong :: proc(app: ^AppData) {
   }
   app.playlist.playingSongIdx = newIdx
   ChangeLoadedMusicStream(app, newIdx)
+
+  if app.musicLooping {
+    HandleMusicLooping(app)
+  }
 }
 
 ForwardTime :: #force_inline proc(app: ^AppData, seconds: f32)
@@ -735,6 +762,42 @@ OpenFolderCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filter: i32
   }
 }
 
+/* Pause or resume the music track depending on app.musicPause */
+PauseOrResume :: #force_inline proc(app: ^AppData)
+{
+  if app.musicPause {
+    if !mix.PauseTrack(app.musicTrack) {
+      sdl.Log("Could not stop track: %s", sdl.GetError())
+    }
+  } else if !mix.ResumeTrack(app.musicTrack) {
+    sdl.Log("Could not resume track: %s", sdl.GetError())
+  }
+}
+
+RandomizeSongs :: #force_inline proc(app: ^AppData)
+{
+  app.musicPause = false
+  rand.shuffle(app.playlist.songs[:])
+  if app.playlist.activeSongIdx != -1 {
+    app.playlist.activeSongIdx = 0
+  }
+  if app.playlist.playingSongIdx != -1 {
+    app.playlist.playingSongIdx = 0
+    ChangeLoadedMusicStream(app, 0)
+  }
+}
+
+HandleMusicLooping :: proc(app: ^AppData)
+{
+  newloops: c.int = 0
+  if app.musicLooping {
+    newloops = -1
+  }
+  if !mix.SetTrackLoops(app.musicTrack, newloops) {
+    sdl.Log("Could not set music track loops: %s", sdl.GetError())
+  }
+}
+
 Update :: proc(app: ^AppData, input: ^Input)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
@@ -787,43 +850,24 @@ Update :: proc(app: ^AppData, input: ^Input)
     }
   }
 
-  if input.keyPressed[.A] { // temporary while there is no UI for this
+  if input.keyPressed[.A] { // temporary while I find a better key for this
     app.musicLooping = !app.musicLooping
-    newloops: c.int
-    if app.musicLooping {
-      newloops = -1
-    }
-    if !mix.SetTrackLoops(app.musicTrack, newloops) {
-      sdl.Log("Could not set music track loops: %s", sdl.GetError())
-    }
+    HandleMusicLooping(app)
   }
 
   // NOTE: Randomize song order
   if input.keyPressed[.R] {
-    app.musicPause = false
-    rand.shuffle(app.playlist.songs[:])
-    if app.playlist.activeSongIdx != -1 {
-      app.playlist.activeSongIdx = 0
-    }
-    if app.playlist.playingSongIdx != -1 {
-      app.playlist.playingSongIdx = 0
-      ChangeLoadedMusicStream(app, 0)
-    }
+    RandomizeSongs(app)
   }
 
 PAUSE_FADE_OUT_FRAMES :: 80
 
   if app.musicLoaded && (input.keyPressed[.K] || input.keyPressed[.SPACE]) {
     app.musicPause = !app.musicPause
-    if app.musicPause {
-      if !mix.PauseTrack(app.musicTrack) {
-        sdl.Log("Could not stop track: %s", sdl.GetError())
-      }
-    } else if !mix.ResumeTrack(app.musicTrack) {
-      sdl.Log("Could not resume track: %s", sdl.GetError())
-    }
+    PauseOrResume(app)
   }
 
+  List_FreeAll(&app.imageData)
   UI_Prepare(app, input)
 }
 
@@ -850,6 +894,7 @@ Render :: proc(app: ^AppData, input: ^Input)
   sdl.RenderClear(app.renderer)
 
   SDL_RenderClayCommands(&app.clay_renderData, &UIRenderCommands)
+  //sdl.RenderTexture(app.renderer, app.iconSpritesheet.tex, nil, nil)
 
   sdl.RenderPresent(app.renderer)
 }

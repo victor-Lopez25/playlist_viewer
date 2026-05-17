@@ -159,6 +159,46 @@ SongSlider :: proc(app: ^AppData, input: ^Input, id: clay.ElementId)
   }
 }
 
+IconButton :: proc(app: ^AppData, input: ^Input, id: clay.ElementId, color: clay.Color, idx: UI_Button, isOn: ^bool = nil, invertShading := false) -> (pressed: bool)
+{
+  color := color
+  clay._OpenElementWithId(id)
+
+  if clay.Hovered() {
+    if input.mouseLeftDown {
+      color *= {0.8,0.8,0.8,1.0} if !invertShading else {1.2,1.2,1.2,1.0}
+    } else {
+      if input.mouseLeftReleased {
+        if isOn != nil { isOn^ = !(isOn^) }
+        pressed = true
+      }
+      color *= {0.9,0.9,0.9,1.0} if !invertShading else {1.1,1.1,1.1,1.0}
+    }
+    color.x = min(color.x, 255)
+    color.y = min(color.y, 255)
+    color.z = min(color.z, 255)
+  }
+
+  clay.ConfigureOpenElement({
+    layout = {padding = clay.PaddingAll(2)},
+    backgroundColor = color,
+    cornerRadius = clay.CornerRadiusAll(2),
+  })
+
+  imgdata := Clay_ImageRenderData{
+    texture = nil,
+    spritesheet = &app.iconSpritesheet,
+    imgIdx = i32(idx),
+  }
+  if clay.UI()({
+    layout = {sizing = {width = clay.SizingFixed(32), height = clay.SizingFixed(32)}},
+    image = {imageData = List_Append(&app.imageData, imgdata, app.arena_allocator)}}) {}
+
+  clay._CloseElement()
+
+  return
+}
+
 UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.RenderCommand)
 {
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
@@ -242,7 +282,6 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
             musicPlayedSecs := mix.TrackFramesToMS(app.musicTrack, sdl.Sint64(app.musicSliderValue)) / 1000
             musicPlayedMins := musicPlayedSecs / 60
             musicPlayedSecs %= 60
-            // NOTE: IMPORTANT: I don't like how this looks, I will for sure do another pass on the ui
             musicText := fmt.tprintf("%2d:%2d/%2d:%2d", musicPlayedMins, musicPlayedSecs, musicLenMins, musicLenSecs)
             clay.Text(musicText, clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
 
@@ -251,10 +290,46 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
             }
 
             prevVolume := app.volume
-            if clay.UI()({layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, childAlignment = {.Right, .Bottom}}}) {
-              GeneralSlider(app, input, {id = clay.ID("volumeSlider"), width = clay.SizingPercent(0.4), max = 1.0, value = &app.volume})
-              clay.Text(fmt.tprintf("volume: %3.1f%%", 100.0*app.volume), clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
+            if clay.UI()({layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, childAlignment = {.Left, .Bottom}}})
+            {
+              if clay.UI(clay.ID("BottomContainer"))({
+                layout = {
+                  layoutDirection = .LeftToRight,
+                  sizing = sizingGrow00,
+                  childAlignment = {.Left, .Bottom},
+                  childGap = 4,
+                }})
+              {
+                backcolor := COLOR_LIGHT
+                backcolor_dark := backcolor * {0.95,0.95,0.95,1.0}
+                if IconButton(app, input, clay.ID("PlayButton"), backcolor, 
+                              UI_Button.PLAY if app.musicPause else UI_Button.PAUSE,
+                              &app.musicPause)
+                {
+                  PauseOrResume(app)
+                }
+
+                if IconButton(app, input, clay.ID("RandomizeButton"), backcolor,
+                              UI_Button.RANDOMIZE)
+                {
+                  RandomizeSongs(app)
+                }
+
+                if IconButton(app, input, clay.ID("LoopingButton"),
+                              backcolor_dark if app.musicLooping else backcolor,
+                              UI_Button.LOOP_CURRENT, &app.musicLooping, app.musicLooping)
+                {
+                  HandleMusicLooping(app)
+                }
+
+                if clay.UI()({layout = {layoutDirection = .TopToBottom, sizing = sizingGrow00, childAlignment = {.Right, .Bottom}}})
+                {
+                  GeneralSlider(app, input, {id = clay.ID("volumeSlider"), width = clay.SizingPercent(0.5), max = 1.0, value = &app.volume})
+                  clay.Text(fmt.tprintf("volume: %3.1f%%", 100.0*app.volume), clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
+                }
+              }
             }
+
             if app.volume != prevVolume {
               if !mix.SetMixerGain(app.mixer, app.volume) {
                 sdl.Log("Could not set volume: %s", sdl.GetError())
