@@ -606,7 +606,9 @@ AppDeInit :: proc(rawApp: rawptr, rawInput: rawptr)
   delete(app.clay_renderData.fonts)
   ttf.DestroyRendererTextEngine(app.clay_renderData.textEngine)
   ttf.Quit()
-  
+
+  DestroySDL_SpritesheetData(&app.iconSpritesheet)
+
   if app.musicAudio != nil {
     mix.DestroyAudio(app.musicAudio)
   }

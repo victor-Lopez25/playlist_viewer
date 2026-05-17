@@ -47,7 +47,6 @@ TERNIARY    :: 3
 
 SpritesheetData :: struct {
   aseprite: AsepriteSpritesheetJson,
-  srcImg: ^sdl.Surface,
   indexedImg: ^sdl.Surface,
   palette: ^sdl.Palette,
   tex: ^sdl.Texture,
@@ -86,14 +85,15 @@ LoadAsepriteSpritesheetData :: proc(spritesheetData: ^SpritesheetData, jsonfile:
   } else {
     imgfile = strings.clone_to_cstring(spritesheetData.aseprite.meta.image, context.temp_allocator)
   }
-  spritesheetData.srcImg = sdl_img.Load(imgfile)
-  if spritesheetData.srcImg == nil {
+  srcImg := sdl_img.Load(imgfile)
+  defer sdl.DestroySurface(srcImg)
+  if srcImg == nil {
     fmt.eprintfln("Could not load spritesheet image from file %s: %s", 
       spritesheetData.aseprite.meta.image, sdl.GetError())
     return false
   }
 
-  spritesheetData.indexedImg = sdl.ConvertSurface(spritesheetData.srcImg, .INDEX8)
+  spritesheetData.indexedImg = sdl.ConvertSurface(srcImg, .INDEX8)
   if spritesheetData.indexedImg == nil {
     fmt.eprintfln("Could not convert spritesheet surface to indexed: %s", sdl.GetError())
     return false
@@ -142,4 +142,28 @@ MapSpritesheetColors :: proc(renderer: ^sdl.Renderer, spritesheet: ^SpritesheetD
   sdl.UnlockMutex(spritesheet.texMutex)
 
   return true
+}
+
+DestroySpritesheetData :: proc(data: ^SpritesheetData, allocator: mem.Allocator)
+{
+  for f in data.aseprite.frames {
+    delete(f.filename, allocator)
+  }
+  delete(data.aseprite.frames, allocator)
+  delete(data.aseprite.meta.app, allocator)
+  delete(data.aseprite.meta.version, allocator)
+  delete(data.aseprite.meta.image, allocator)
+  delete(data.aseprite.meta.format, allocator)
+  delete(data.aseprite.meta.scale, allocator)
+
+  DestroySDL_SpritesheetData(data)
+}
+
+/* does not destroy anything in data.aseprite */
+DestroySDL_SpritesheetData :: proc(data: ^SpritesheetData)
+{
+  sdl.DestroySurface(data.indexedImg)
+  sdl.DestroyPalette(data.palette)
+  sdl.DestroyTexture(data.tex)
+  sdl.DestroyMutex(data.texMutex)
 }
