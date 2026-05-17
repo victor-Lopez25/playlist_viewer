@@ -542,7 +542,7 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   } else {
     app.defaultConfig.header.volume = 0.15
     app.defaultConfig.defaultSongDirectory = "songs"
-    app.defaultConfig.currentSongPlaylist = "lists/NCS.list"
+    app.defaultConfig.currentSongPlaylist = "lists/music.list"
   }
   app.volume = clamp(app.defaultConfig.header.volume, 0.0, 0.4)
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer) // config file parsing
