@@ -163,7 +163,6 @@ DestroySpritesheetData :: proc(data: ^SpritesheetData, allocator: mem.Allocator)
 DestroySDL_SpritesheetData :: proc(data: ^SpritesheetData)
 {
   sdl.DestroySurface(data.indexedImg)
-  sdl.DestroyPalette(data.palette)
   sdl.DestroyTexture(data.tex)
   sdl.DestroyMutex(data.texMutex)
 }
