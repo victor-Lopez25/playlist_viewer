@@ -12,9 +12,13 @@ TARGET_NS :: 1000000000.0 / TARGET_FPS
 
 UI_Button :: enum {
   PLAY = 0,
-  RANDOMIZE = 1,
-  LOOP_CURRENT = 2,
-  PAUSE = 3,
+  RANDOMIZE,
+  LOOP_CURRENT,
+  PAUSE,
+  PLUS,
+  MINUS,
+  OPEN_DIR,
+  OPEN_DIR_PLUS,
 }
 
 SongSourceType :: enum {
