@@ -100,6 +100,26 @@ PrintSongs :: proc(songs: []SongData)
 
 ParseSongs :: proc(app: ^AppData, data: []u8)
 {
+  /* returns if the extension was correct */
+  ParseSongFile :: proc(app: ^AppData, filename: string) -> bool
+  {
+    if !CheckMusicFileExt(os.ext(filename), include_dot = true) {
+      return false
+    }
+
+    // NOTE: Metadata will be read when the song gets loaded
+    song := SongData {
+      name = "",
+      group = "",
+      album = "",
+      filename = os.short_stem(filename),
+      source = filename,
+      sourceType = .File,
+    }
+    append(&app.playlist.songData, song)
+    return true
+  }
+
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
   source := string(data)
@@ -110,25 +130,43 @@ ParseSongs :: proc(app: ^AppData, data: []u8)
     if line == "" do continue
 
     if !os.exists(line) {
-      sdl.Log("Error in line %d: Could not find music file '%s', ignoring this file...", lineIdx, line)
+      fmt.eprintfln("Error in line %d: Could not find music file/directory '%s', ignoring this line...", lineIdx, line)
       continue
     }
 
-    if !CheckMusicFileExt(os.ext(line), include_dot = true) {
-      sdl.Log("Error in line %d: '%s' is not a music file, ignoring this file...", lineIdx, line)
-      continue
-    }
+    if os.is_file(line) {
+      if !ParseSongFile(app, line) {
+        fmt.eprintfln("Error in line %d: '%s' is not a music file, ignoring this file...", lineIdx, line)
+      }
+    } else if os.is_directory(line) {
+      dir, open_err := os.open(line)
+      if open_err != nil {
+        fmt.eprintfln("Could not read directory %s: %v", line, open_err)
+        continue
+      }
+      defer os.close(dir)
 
-    song := SongData {
-      // NOTE: Metadata will be read when the song gets loaded
-      name = "",
-      group = "",
-      album = "",
-      filename = os.short_stem(line),
-      source = line,
-      sourceType = .File,
+      it := os.read_directory_iterator_create(dir)
+      defer os.read_directory_iterator_destroy(&it)
+
+      found_any := false
+      for entry_info in os.read_directory_iterator(&it) {
+        if path, err := os.read_directory_iterator_error(&it); err != nil {
+          fmt.eprintfln("Could not read %s: %v", path, err)
+          continue
+        }
+
+        if entry_info.type == .Regular {
+          if ParseSongFile(app, strings.clone(entry_info.fullpath, app.arena_allocator)) {
+            found_any = true
+          }
+        }
+      }
+
+      if !found_any {
+        fmt.eprintfln("Error in line %d: Could not find any music files in directory '%s'", lineIdx, line)
+      }
     }
-    append(&app.playlist.songData, song)
   }
 }
 
