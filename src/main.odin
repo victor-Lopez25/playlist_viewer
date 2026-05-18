@@ -587,13 +587,9 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   }
 
   {
-    //primary := sdl.Color{10, 250, 180, 255}
-    //secondary := sdl.Color{10, 220, 250, 255}
-    //terniary := sdl.Color{80, 10, 250, 255}
-
-    primary := sdl.Color{255, 0, 0, 255}
-    secondary := sdl.Color{0, 0, 255, 255}
-    terniary := sdl.Color{0, 255, 0, 255}
+    primary := sdl.Color{0xf7, 0xe6, 0x25, 255}
+    secondary := sdl.Color{0xb3, 0x02, 0xc7, 255}
+    terniary := sdl.Color{0xf0, 0x83, 0x07, 255}
     if !MapSpritesheetColors(app.renderer, &app.iconSpritesheet, primary, secondary, terniary) {
       fmt.eprintfln("Could not map spritesheet colors")
       return false
