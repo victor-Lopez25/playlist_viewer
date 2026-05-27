@@ -172,7 +172,7 @@ IconButton :: proc(app: ^AppData, input: ^Input, id: clay.ElementId, color: clay
         if isOn != nil { isOn^ = !(isOn^) }
         pressed = true
       }
-      color *= {0.9,0.9,0.9,1.0} if !invertShading else {1.1,1.1,1.1,1.0}
+      color *= {0.85,0.85,0.85,1.0} if !invertShading else {1.15,1.15,1.15,1.0}
     }
     color.x = min(color.x, 255)
     color.y = min(color.y, 255)
@@ -222,10 +222,19 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
         layoutDirection = .TopToBottom, sizing = {width = clay.SizingFixed(300), height = clay.SizingGrow({})}, padding = {0, 0, 0, 16}, childGap = 16},
         backgroundColor = COLOR_LIGHT})
     {
-      if clay.UI(clay.ID("Playlist"))({layout = {layoutDirection = .TopToBottom, padding = {16,16,16,16}, sizing = sizingGrow00}, backgroundColor = COLOR_ORANGE}) {
-        clay.Text(playlist.name, clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
-        songCountText := fmt.tprintf("%d songs", len(playlist.songs))
-        clay.Text(songCountText, clay.TextElementConfig({fontSize = 12, textColor = {0, 0, 0, 255}}))
+      if clay.UI(clay.ID("Playlist"))({layout = {layoutDirection = .LeftToRight, sizing = sizingGrow00}, backgroundColor = COLOR_ORANGE}) {
+        if clay.UI()({layout = {layoutDirection = .TopToBottom, padding = {16,16,16,16}, sizing = sizingGrow00}}) {
+          clay.Text(playlist.name, clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
+          songCountText := fmt.tprintf("%d songs", len(playlist.songs))
+          clay.Text(songCountText, clay.TextElementConfig({fontSize = 12, textColor = {0, 0, 0, 255}}))
+        }
+ 
+        if clay.UI(clay.ID("PlaylistButtons"))({layout = {padding = {16,16,16,16}}}) {
+          if IconButton(app, input, clay.ID("OpenDirButton"), COLOR_LIGHT, UI_Button.OPEN_DIR)
+          {
+            sdl.ShowOpenFolderDialog(OpenFolderCallback, cast(rawptr)app, app.window, ".", true)
+          }
+        }
       }
 
       if clay.UI(clay.ID("SongList"))({layout = { layoutDirection = .TopToBottom, padding = {16, 24, 0, 0}, childGap = 6, sizing = {width = sizingGrow0, height = sizingGrow0 }}, //clay.SizingFit({})}},
