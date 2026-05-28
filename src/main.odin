@@ -829,9 +829,9 @@ OpenFolderAddPermCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filt
 
   OpenFolderGeneric(app, filelist)
 
-  // TODO: Add the folders to song list
   for i := 0; filelist[i] != nil; i += 1 {
     folder := string(filelist[i])
+    strings.write_rune(&app.songlist, '\n')
     strings.write_string(&app.songlist, folder)
   }
 }
