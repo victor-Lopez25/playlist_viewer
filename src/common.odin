@@ -1,6 +1,7 @@
 package main
 
 import "core:mem"
+import "core:strings"
 import "core:mem/virtual"
 import spall "spall-wrapper"
 import clay "clay-odin"
@@ -24,6 +25,7 @@ UI_Button :: enum {
 SongSourceType :: enum {
   None, /* no song source */
   File, /* song is stored locally */
+  Folder, /* song is stored locally in a folder */
   Link, /* need to look for the song online */
 }
 
@@ -91,6 +93,7 @@ AppData :: struct {
 
   sliderSelected: clay.ElementId,
 
+  songlist: strings.Builder,
   playlistFileAbsPath: cstring,
 
   eventFilterData: EventFilterData,

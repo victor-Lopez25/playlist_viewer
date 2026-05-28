@@ -101,20 +101,21 @@ PrintSongs :: proc(songs: []SongData)
 ParseSongs :: proc(app: ^AppData, data: []u8)
 {
   /* returns if the extension was correct */
-  ParseSongFile :: proc(app: ^AppData, filename: string) -> bool
+  ParseSongFile :: proc(app: ^AppData, filename: string, fromFolder: bool) -> bool
   {
     if !CheckMusicFileExt(os.ext(filename), include_dot = true) {
       return false
     }
-
+    
+    file := strings.clone(filename, app.arena_allocator)
     // NOTE: Metadata will be read when the song gets loaded
     song := SongData {
       name = "",
       group = "",
       album = "",
-      filename = os.short_stem(filename),
-      source = filename,
-      sourceType = .File,
+      filename = os.short_stem(file),
+      source = file,
+      sourceType = .File if !fromFolder else .Folder,
     }
     append(&app.playlist.songData, song)
     return true
@@ -135,7 +136,7 @@ ParseSongs :: proc(app: ^AppData, data: []u8)
     }
 
     if os.is_file(line) {
-      if !ParseSongFile(app, line) {
+      if !ParseSongFile(app, line, false) {
         fmt.eprintfln("Error in line %d: '%s' is not a music file, ignoring this file...", lineIdx, line)
       }
     } else if os.is_directory(line) {
@@ -157,7 +158,7 @@ ParseSongs :: proc(app: ^AppData, data: []u8)
         }
 
         if entry_info.type == .Regular {
-          if ParseSongFile(app, strings.clone(entry_info.fullpath, app.arena_allocator)) {
+          if ParseSongFile(app, entry_info.fullpath, true) {
             found_any = true
           }
         }
@@ -243,6 +244,8 @@ ChangeLoadedMusicStream :: proc(app: ^AppData, newIdx: int)
       case .Link: {
         assert(false, "unimplemented")
       }
+
+      case .Folder: fallthrough
       case .File: {
         if os.exists(activeSong.source) {
           filename := strings.clone_to_cstring(activeSong.source, context.temp_allocator)
@@ -458,17 +461,18 @@ InitSDL3 :: proc(app: ^AppData, input: ^Input) -> bool
   return true
 }
 
-ParseConfigFile :: proc(rawData: []u8) -> (ConfigFileInfo, bool)
+ParseConfigFile :: proc(app: ^AppData, rawData: []u8) -> (ConfigFileInfo, bool)
 {
   data := (cast(^ConfigFileInfo)(&rawData[0]))^
 
   // 4096 = path max I'm using, could be more?
   data.defaultSongDirectory = 
-    strings.string_from_null_terminated_ptr(&rawData[data.header.stringTableOffset], 4096)
+    strings.clone_from_cstring(cast(cstring)&rawData[data.header.stringTableOffset], app.arena_allocator)
 
   currPlaylistOffset := data.header.stringTableOffset + u32(len(data.defaultSongDirectory)) + 1
 
-  data.currentSongPlaylist = strings.string_from_null_terminated_ptr(&rawData[currPlaylistOffset], 4096)
+  data.currentSongPlaylist = 
+    strings.clone_from_cstring(cast(cstring)&rawData[currPlaylistOffset], app.arena_allocator)
 
   return data, true
 }
@@ -532,13 +536,13 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   data: []u8
   spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "config file parsing")
   if os.exists(CONFIG_FILE_NAME) {
-    data, err = os.read_entire_file(CONFIG_FILE_NAME, context.allocator)
+    data, err = os.read_entire_file(CONFIG_FILE_NAME, context.temp_allocator)
     if err != nil {
       fmt.eprintfln("Could not read " + CONFIG_FILE_NAME + " file: %v", err)
       return false
     }
 
-    app.defaultConfig, _ = ParseConfigFile(data)
+    app.defaultConfig, _ = ParseConfigFile(app, data)
   } else {
     app.defaultConfig.header.volume = 0.15
     app.defaultConfig.defaultSongDirectory = "songs"
@@ -550,23 +554,32 @@ AppInit :: proc(rawApp: rawptr, rawInput: rawptr) -> bool
   listFile := app.defaultConfig.currentSongPlaylist
 
   spall._buffer_begin(&app.spall_ctx, &app.spall_buffer, "playlist building")
-  data, err = os.read_entire_file(listFile, context.allocator)
-  if err != nil {
-    fmt.eprintfln("Could not read %s file: %v", listFile, err)
-    return false
-  }
-  ParseSongs(app, data)
-  resize(&app.playlist.songs, len(app.playlist.songData))
-  for i := 0; i < len(app.playlist.songData); i += 1 {
-    app.playlist.songs[i] = &app.playlist.songData[i]
-  }
-  app.playlist.activeSongIdx = -1
-  app.playlist.playingSongIdx = -1
-  app.playlist.name = os.short_stem(listFile)
+  {
+    app.songlist, err = strings.builder_make_len_cap(0, 4096, context.allocator)
+    if err != nil {
+      fmt.eprintfln("Could not make string builder for songlist: %v", err)
+      return false
+    }
 
-  if !slashpath.is_abs(listFile) {
-    abspath, _ := os.get_absolute_path(listFile, context.temp_allocator)
-    app.playlistFileAbsPath = strings.clone_to_cstring(abspath)
+    data, err = os.read_entire_file(listFile, context.temp_allocator)
+    if err != nil {
+      fmt.eprintfln("Could not read %s file: %v", listFile, err)
+      return false
+    }
+    ParseSongs(app, data)
+    strings.write_bytes(&app.songlist, data)
+    resize(&app.playlist.songs, len(app.playlist.songData))
+    for i := 0; i < len(app.playlist.songData); i += 1 {
+      app.playlist.songs[i] = &app.playlist.songData[i]
+    }
+    app.playlist.activeSongIdx = -1
+    app.playlist.playingSongIdx = -1
+    app.playlist.name = os.short_stem(listFile)
+  
+    if !slashpath.is_abs(listFile) {
+      abspath, _ := os.get_absolute_path(listFile, context.temp_allocator)
+      app.playlistFileAbsPath = strings.clone_to_cstring(abspath)
+    }
   }
   spall._buffer_end(&app.spall_ctx, &app.spall_buffer) // playlist building
 
@@ -663,6 +676,11 @@ AppDeInit :: proc(rawApp: rawptr, rawInput: rawptr)
     SerializeConfigFile(app, dF)
 
     os.close(dF)
+
+    err = os.write_entire_file_from_string(string(app.playlistFileAbsPath), strings.to_string(app.songlist))
+    if err != nil {
+      fmt.eprintfln("Could not write list file modifications: %v", err)
+    }
   }
 
   // NOTE: Spall deInit
@@ -777,11 +795,8 @@ GetInput :: proc(app: ^AppData, input: ^Input) -> (shouldQuit: bool)
   return
 }
 
-OpenFolderCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filter: i32)
+OpenFolderGeneric :: proc(app: ^AppData, filelist: [^]cstring)
 {
-  // NOTE: filter is only used to open files
-  app := cast(^AppData)rawapp
-
   if filelist == nil {
     sdl.Log("An error occurred: %s", sdl.GetError())
     return
@@ -790,11 +805,34 @@ OpenFolderCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filter: i32
     return
   }
 
-  context = app.eventFilterData.Context
-
   // NOTE: Extensions get checked in AddsSongsToList
   for i := 0; filelist[i] != nil; i += 1 {
     AddSongsToList(app, filelist[i])
+  }
+}
+
+OpenFolderAddTempCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filter: i32)
+{
+  // NOTE: filter is only used to open files
+  app := cast(^AppData)rawapp
+  context = app.eventFilterData.Context
+
+  OpenFolderGeneric(app, filelist)
+}
+
+/* Permanently add the folders to the current song list */
+OpenFolderAddPermCallback :: proc "c"(rawapp: rawptr, filelist: [^]cstring, filter: i32)
+{
+  // NOTE: filter is only used to open files
+  app := cast(^AppData)rawapp
+  context = app.eventFilterData.Context
+
+  OpenFolderGeneric(app, filelist)
+
+  // TODO: Add the folders to song list
+  for i := 0; filelist[i] != nil; i += 1 {
+    folder := string(filelist[i])
+    strings.write_string(&app.songlist, folder)
   }
 }
 
@@ -839,7 +877,7 @@ Update :: proc(app: ^AppData, input: ^Input)
   spall.SCOPED_EVENT(&app.spall_ctx, &app.spall_buffer, #procedure)
 
   if input.ctrlDown && input.keyPressed[.O] {
-    sdl.ShowOpenFolderDialog(OpenFolderCallback, cast(rawptr)app, app.window, ".", true)
+    sdl.ShowOpenFolderDialog(OpenFolderAddTempCallback, cast(rawptr)app, app.window, ".", true)
   }
 
   // If the song finished, go to the next

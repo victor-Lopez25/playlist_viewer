@@ -229,10 +229,15 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
           clay.Text(songCountText, clay.TextElementConfig({fontSize = 12, textColor = {0, 0, 0, 255}}))
         }
  
-        if clay.UI(clay.ID("PlaylistButtons"))({layout = {padding = {16,16,16,16}}}) {
-          if IconButton(app, input, clay.ID("OpenDirButton"), COLOR_LIGHT, UI_Button.OPEN_DIR)
+        if clay.UI(clay.ID("PlaylistButtons"))({layout = {padding = {16,16,16,16}, childGap = 8}}) {
+          if IconButton(app, input, clay.ID("OpenDirTempButton"), COLOR_LIGHT, UI_Button.OPEN_DIR)
           {
-            sdl.ShowOpenFolderDialog(OpenFolderCallback, cast(rawptr)app, app.window, ".", true)
+            sdl.ShowOpenFolderDialog(OpenFolderAddTempCallback, cast(rawptr)app, app.window, ".", true)
+          }
+
+          if IconButton(app, input, clay.ID("OpenDirPermButton"), COLOR_LIGHT, UI_Button.OPEN_DIR_PLUS)
+          {
+            sdl.ShowOpenFolderDialog(OpenFolderAddPermCallback, cast(rawptr)app, app.window, ".", true)
           }
         }
       }
