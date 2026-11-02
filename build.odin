@@ -118,7 +118,10 @@ main :: proc()
   append(&cmd, "odin", "build", "src", "-vet", "-vet-using-param", "-vet-style", 
          "-build-mode:dll", "-out:" + OUT_DIRECTORY + "/app" + DLL_EXT)
   when ODIN_OS == .Windows {
-    append(&cmd, pdb_name)
+    if debugMode {
+      append(&cmd, pdb_name)
+    }
+    append(&cmd, "-linker:msvc")
   }
 
   if debugMode {

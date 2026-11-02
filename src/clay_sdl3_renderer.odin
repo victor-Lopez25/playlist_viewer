@@ -12,7 +12,7 @@ SDL_MeasureText :: proc "c"(text: clay.StringSlice, config: ^clay.TextElementCon
   font := fonts[config.fontId]
 
   width, height: i32
-  if !ttf.GetStringSize(font, cstring(text.chars), uint(text.length), &width, &height) {
+  if !ttf.GetStringSize(font, text.chars, uint(text.length), &width, &height) {
     sdl.LogError(i32(sdl.LogCategory.ERROR), "Failed to measure text: %s", sdl.GetError())
   }
 
@@ -210,7 +210,7 @@ SDL_RenderClayCommands :: proc(rendererData: ^Clay_SDL3RendererData, rcommands: 
       case .Text: {
         config := &rcmd.renderData.text
         font := rendererData.fonts[config.fontId]
-        text := ttf.CreateText(rendererData.textEngine, font, cstring(config.stringContents.chars), uint(config.stringContents.length))
+        text := ttf.CreateText(rendererData.textEngine, font, config.stringContents.chars, uint(config.stringContents.length))
         ok := ttf.SetTextColor(text, u8(config.textColor.r), u8(config.textColor.g), u8(config.textColor.b), u8(config.textColor.a))
         assert(ok)
         ok = ttf.DrawRendererText(text, rect.x, rect.y)

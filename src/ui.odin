@@ -296,7 +296,7 @@ UI_Calculate :: proc(app: ^AppData, input: ^Input) -> clay.ClayArray(clay.Render
             musicPlayedSecs := mix.TrackFramesToMS(app.musicTrack, sdl.Sint64(app.musicSliderValue)) / 1000
             musicPlayedMins := musicPlayedSecs / 60
             musicPlayedSecs %= 60
-            musicText := fmt.tprintf("%2d:%2d/%2d:%2d", musicPlayedMins, musicPlayedSecs, musicLenMins, musicLenSecs)
+            musicText := fmt.tprintf("%02d:%02d/%02d:%02d", musicPlayedMins, musicPlayedSecs, musicLenMins, musicLenSecs)
             clay.Text(musicText, clay.TextElementConfig({fontSize = 14, textColor = {0, 0, 0, 255}}))
 
             if clay.UI()({layout = {sizing = {sizingGrow0, clay.SizingFit({})}, padding = {4, 4, 0, 0}}}) {
